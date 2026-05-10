@@ -65,7 +65,7 @@ inline ACE_INT64 ace_strtoll_helper (const char *s, char **ptr, int base)
 #endif /* !ACE_LACKS_STRTOLL && !ACE_STRTOLL_EQUIVALENT */
 
 #if !defined (ACE_LACKS_STRTOULL) && !defined (ACE_STRTOULL_EQUIVALENT)
-inline ACE_INT64 ace_strtoull_helper (const char *s, char **ptr, int base)
+inline ACE_UINT64 ace_strtoull_helper (const char *s, char **ptr, int base)
 {
 # if defined (strtoull)
   return strtoull (s, ptr, base);
@@ -83,7 +83,7 @@ inline int ace_rand_r_helper (unsigned *seed)
   return rand_r (seed);
 #  undef rand_r
 #  else
-  return ACE_STD_NAMESPACE::rand_r (seed);
+  return ::rand_r (seed);
 #  endif /* rand_r */
 }
 #endif /* !ACE_LACKS_RAND_R */

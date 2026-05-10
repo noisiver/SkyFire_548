@@ -21,9 +21,9 @@
 
 #include "ace/os_include/sys/os_types.h"
 #include "ace/os_include/sys/os_mman.h"
-#include "ace/os_include/sys/os_types.h"
 #include <limits>
 #include <new>
+#include <cstddef>
 
 ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 
@@ -186,7 +186,9 @@ public:
   static T* allocate(std::size_t n)
   {
     void* raw_mem = ACE_Allocator::instance()->malloc(n * sizeof(T));
+#if !defined (ACE_INTEGRITY) || _HAS_EXCEPTIONS
     if (!raw_mem) throw std::bad_alloc();
+#endif
     return static_cast<T*>(raw_mem);
   }
 

@@ -28,7 +28,7 @@ ACE_OS::asctime_r (const struct tm *t, char *buf, int buflen)
 # if defined (ACE_HAS_2_PARAM_ASCTIME_R_AND_CTIME_R)
   char *result = 0;
   ace_asctime_r_helper (t, buf);
-  ACE_OS::strsncpy (buf, result, buflen);
+  ACE_OS::strsncpy (buf, result, static_cast<size_t> (buflen));
   return buf;
 # else
 #   if defined (ACE_HAS_SIZET_PTR_ASCTIME_R_AND_CTIME_R)
@@ -255,7 +255,7 @@ ACE_OS::gethrtime (const ACE_HRTimer_Op op)
   ::QueryPerformanceCounter (&freq);
 
   return freq.QuadPart;
-#elif defined (ghs) && defined (ACE_HAS_PENTIUM)
+#elif defined (__ghs__) && defined (ACE_HAS_PENTIUM)
   ACE_UNUSED_ARG (op);
   // Use .obj/gethrtime.o, which was compiled with g++.
   return ACE_GETHRTIME_NAME ();
@@ -278,14 +278,14 @@ ACE_OS::gethrtime (const ACE_HRTimer_Op op)
 # endif
 
   return now;
-#elif defined (ACE_HAS_POWERPC_TIMER) && (defined (ghs) || defined (__GNUG__))
+#elif defined (ACE_HAS_POWERPC_TIMER) && (defined (__ghs__) || defined (__GNUG__))
   // PowerPC w/ GreenHills or g++.
 
   ACE_UNUSED_ARG (op);
   u_long most;
   u_long least;
 
-#  if defined (ghs)
+#  if defined (__ghs__)
   ACE_OS::readPPCTimeBase (most, least);
 #  else
   u_long scratch;
@@ -404,7 +404,14 @@ ACE_OS::strftime (char *s, size_t maxsize, const char *format,
   ACE_UNUSED_ARG (timeptr);
   ACE_NOTSUP_RETURN (0);
 #else
+#  ifdef __GNUC__
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wformat-nonliteral"
+#  endif
   return std::strftime (s, maxsize, format, timeptr);
+#  ifdef __GNUC__
+#    pragma GCC diagnostic pop
+#  endif
 #endif /* ACE_LACKS_STRFTIME */
 }
 

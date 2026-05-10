@@ -66,9 +66,6 @@
     <ClCompile Include="Asynch_IO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Asynch_IO_Impl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Asynch_Pseudo_Task.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -154,9 +151,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Containers.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Copy_Disabled.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Date_Time.cpp">
@@ -747,6 +741,9 @@
     <ClCompile Include="Signal.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Single_Input_Reactor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="SOCK.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -1158,6 +1155,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="config-icc-common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config-integrity-common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config-integrity.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config-integrity178.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="config-integritySCA.h">
@@ -2393,6 +2399,9 @@
     <ClInclude Include="Signal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Single_Input_Reactor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="Singleton.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -2867,9 +2876,6 @@
       <Filter>Inline Files</Filter>
     </None>
     <None Include="Array_Map.inl">
-      <Filter>Inline Files</Filter>
-    </None>
-    <None Include="Asynch_IO_Impl.inl">
       <Filter>Inline Files</Filter>
     </None>
     <None Include="ATM_Acceptor.inl">

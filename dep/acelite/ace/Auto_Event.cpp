@@ -1,5 +1,3 @@
-#ifndef ACE_AUTO_EVENT_CPP
-#define ACE_AUTO_EVENT_CPP
 #include "ace/Auto_Event.h"
 
 #if defined (ACE_HAS_ALLOC_HOOKS)
@@ -50,5 +48,3 @@ ACE_Auto_Event_T<TIME_POLICY>::dump () const
 }
 
 ACE_END_VERSIONED_NAMESPACE_DECL
-
-#endif

@@ -5,7 +5,6 @@
 #include "ace/OS_NS_unistd.h"
 #include "ace/OS_NS_string.h"
 #include "ace/OS_Memory.h"
-#include "ace/ARGV.h"
 
 #if !defined (__ACE_INLINE__)
 #include "ace/ARGV.inl"
@@ -350,7 +349,7 @@ ACE_ARGV_T<CHAR_TYPE>::create_buf_from_queue ()
                         -1);
 #else
   ACE_NEW_RETURN (this->buf_,
-                  CHAR_TYPE[this->length_ + this->argc_],
+                  CHAR_TYPE[this->length_ + static_cast<unsigned int> (this->argc_)],
                   -1);
 #endif /* ACE_HAS_ALLOC_HOOKS */
 

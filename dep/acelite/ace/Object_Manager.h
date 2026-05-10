@@ -40,6 +40,9 @@ ACE_BEGIN_VERSIONED_NAMESPACE_DECL
   class ACE_Thread_Mutex;
   class ACE_Recursive_Thread_Mutex;
   class ACE_RW_Thread_Mutex;
+#if defined (ACE_INTEGRITY) && defined (ACE_HAS_TSS_EMULATION) && !defined (ACE_HAS_THREAD_SPECIFIC_STORAGE)
+  class ACE_INTEGRITY_TSS_Impl;
+#endif
 
 ACE_END_VERSIONED_NAMESPACE_DECL
 
@@ -118,7 +121,7 @@ template <class T> class ACE_Cleanup_Adapter;
  * can be used to register any object or array for any
  * cleanup activity at program termination.
  * 2) ACE_Object_Manager::at_exit (ACE_Cleanup *object,
- * void *param = 0);
+ * void *param = nullptr);
  * can be used to register an ACE_Cleanup object
  * for any cleanup activity at program termination.
  * The final mechanism is not general purpose, but can only
@@ -242,7 +245,7 @@ public:
    * shutting down, ENOMEM if insufficient virtual memory, or EEXIST
    * if the object (or array) had already been registered.
    */
-  static int at_exit (ACE_Cleanup *object, void *param = 0, const char* name = 0);
+  static int at_exit (ACE_Cleanup *object, void *param = nullptr, const char* name = nullptr);
 
 #if defined (ACE_HAS_TSS_EMULATION)
   static int init_tss ();
@@ -300,6 +303,9 @@ public:
       ACE_TOKEN_INVARIANTS_CREATION_LOCK,
 #endif /* ! ACE_LACKS_ACE_TOKEN */
       ACE_PROACTOR_EVENT_LOOP_LOCK,
+#if defined (ACE_INTEGRITY) && defined (ACE_HAS_TSS_EMULATION) && !defined (ACE_HAS_THREAD_SPECIFIC_STORAGE)
+      ACE_INTEGRITY_TSS_IMPL,
+#endif
 #endif /* ACE_MT_SAFE */
 
       // Hook for preallocated objects provided by application.

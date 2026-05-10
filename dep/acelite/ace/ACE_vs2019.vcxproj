@@ -600,8 +600,6 @@
     </ClCompile>
     <ClCompile Include="Asynch_IO.cpp">
     </ClCompile>
-    <ClCompile Include="Asynch_IO_Impl.cpp">
-    </ClCompile>
     <ClCompile Include="Asynch_Pseudo_Task.cpp">
     </ClCompile>
     <ClCompile Include="Atomic_Op.cpp">
@@ -647,8 +645,6 @@
     <ClCompile Include="Connection_Recycling_Strategy.cpp">
     </ClCompile>
     <ClCompile Include="Containers.cpp">
-    </ClCompile>
-    <ClCompile Include="Copy_Disabled.cpp">
     </ClCompile>
     <ClCompile Include="DEV.cpp">
     </ClCompile>
@@ -1089,6 +1085,8 @@
     <ClCompile Include="Sig_Handler.cpp">
     </ClCompile>
     <ClCompile Include="Signal.cpp">
+    </ClCompile>
+    <ClCompile Include="Single_Input_Reactor.cpp">
     </ClCompile>
     <ClCompile Include="Sock_Connect.cpp">
     </ClCompile>
@@ -2457,6 +2455,7 @@
     <ClInclude Include="Sig_Adapter.h" />
     <ClInclude Include="Sig_Handler.h" />
     <ClInclude Include="Signal.h" />
+    <ClInclude Include="Single_Input_Reactor.h" />
     <ClInclude Include="Singleton.h" />
     <ClInclude Include="Sock_Connect.h" />
     <ClInclude Include="Stack_Trace.h" />
@@ -2558,6 +2557,9 @@
     <ClInclude Include="config-g++-common.h" />
     <ClInclude Include="config-hurd.h" />
     <ClInclude Include="config-icc-common.h" />
+    <ClInclude Include="config-integrity-common.h" />
+    <ClInclude Include="config-integrity.h" />
+    <ClInclude Include="config-integrity178.h" />
     <ClInclude Include="config-integritySCA.h" />
     <ClInclude Include="config-kfreebsd.h" />
     <ClInclude Include="config-linux-common.h" />
@@ -2756,7 +2758,6 @@
     <None Include="Argv_Type_Converter.inl" />
     <None Include="Array_Base.inl" />
     <None Include="Array_Map.inl" />
-    <None Include="Asynch_IO_Impl.inl" />
     <None Include="Atomic_Op.inl" />
     <None Include="Atomic_Op_GCC_T.inl" />
     <None Include="Atomic_Op_T.inl" />

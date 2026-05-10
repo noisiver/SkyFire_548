@@ -19,6 +19,10 @@ namespace ACE_OS
     ACE_OS_TRACE ("ACE_OS::creat");
 #if defined (ACE_WIN32) || defined (ACE_MQX)
     return ACE_OS::open (filename, O_CREAT|O_TRUNC|O_WRONLY, mode);
+#elif defined (ACE_LACKS_CREAT)
+    ACE_UNUSED_ARG (filename);
+    ACE_UNUSED_ARG (mode);
+    ACE_NOTSUP_RETURN (-1);
 #else
     return ::creat (ACE_TEXT_ALWAYS_CHAR (filename), mode);
 #endif /* ACE_WIN32 */
@@ -36,25 +40,33 @@ namespace ACE_OS
         ACE_OS::set_errno_to_last_error ();
         return -1;
       }
-    else if (fdata.nFileSizeHigh != 0)
+    if ((fdata.nFileSizeHigh != 0) && (sizeof (stp->st_size) < sizeof (ULONGLONG)))
       {
-        errno = EINVAL;
+        errno = EINVAL; // return an error rather than incorrect values
         return -1;
       }
-    else
-      {
-        stp->st_size = fdata.nFileSizeLow;
-        stp->st_atime = ACE_Time_Value (fdata.ftLastAccessTime).sec ();
-        stp->st_mtime = ACE_Time_Value (fdata.ftLastWriteTime).sec ();
-        stp->st_ctime = ACE_Time_Value (fdata.ftCreationTime).sec ();
-        stp->st_nlink = static_cast<short> (fdata.nNumberOfLinks);
-        stp->st_dev = stp->st_rdev = 0; // No equivalent conversion.
-        stp->st_mode = S_IXOTH | S_IROTH |
-          (fdata.dwFileAttributes & FILE_ATTRIBUTE_READONLY ? 0 : S_IWOTH) |
-          (fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY ? S_IFDIR : S_IFREG);
-      }
+
+#if defined (_FILE_OFFSET_BITS) && _FILE_OFFSET_BITS == 64
+    ULARGE_INTEGER ul;
+    ul.HighPart = fdata.nFileSizeHigh;
+    ul.LowPart = fdata.nFileSizeLow;
+    stp->st_size = ul.QuadPart;
+#else
+    stp->st_size = fdata.nFileSizeLow;
+#endif /* _FILE_OFFSET_BITS */
+    stp->st_atime = ACE_Time_Value (fdata.ftLastAccessTime).sec ();
+    stp->st_mtime = ACE_Time_Value (fdata.ftLastWriteTime).sec ();
+    stp->st_ctime = ACE_Time_Value (fdata.ftCreationTime).sec ();
+    stp->st_nlink = static_cast<short> (fdata.nNumberOfLinks);
+    stp->st_dev = stp->st_rdev = 0; // No equivalent conversion.
+    mode_t const BASE_MODE = S_IXOTH | S_IROTH;
+    mode_t const WRITE_MODE = (fdata.dwFileAttributes & FILE_ATTRIBUTE_READONLY) ? 0 : S_IWOTH;
+    mode_t const TYPE_MODE = (fdata.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? S_IFDIR : S_IFREG;
+    stp->st_mode = BASE_MODE | WRITE_MODE | TYPE_MODE;
     return 0;
 #elif defined (ACE_LACKS_FSTAT)
+    ACE_UNUSED_ARG (handle);
+    ACE_UNUSED_ARG (stp);
     ACE_NOTSUP_RETURN (-1);
 #elif defined (ACE_MQX)
     return MQX_Filesystem::inst ().fstat (handle, stp);
@@ -139,7 +151,11 @@ namespace ACE_OS
   ACE_INLINE int
   mkdir (const char *path, mode_t mode)
   {
-#if defined (ACE_MKDIR_LACKS_MODE)
+#if defined (ACE_LACKS_MKDIR)
+    ACE_UNUSED_ARG (path);
+    ACE_UNUSED_ARG (mode);
+    ACE_NOTSUP_RETURN (-1);
+#elif defined (ACE_MKDIR_LACKS_MODE)
     ACE_UNUSED_ARG (mode);
 #  if defined (ACE_MKDIR_EQUIVALENT)
     return ACE_MKDIR_EQUIVALENT (path);
@@ -184,6 +200,8 @@ namespace ACE_OS
   {
     ACE_OS_TRACE ("ACE_OS::stat");
 #if defined (ACE_LACKS_STAT)
+    ACE_UNUSED_ARG (file);
+    ACE_UNUSED_ARG (stp);
     ACE_NOTSUP_RETURN (-1);
 #elif defined (ACE_MQX)
     return MQX_Filesystem::inst ().stat (file, stp);

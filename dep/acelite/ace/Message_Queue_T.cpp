@@ -17,7 +17,6 @@
 #endif /* ACE_LACKS_PRAGMA_ONCE */
 
 #include "ace/Notification_Strategy.h"
-#include "ace/Truncate.h"
 #include "ace/Condition_Attributes.h"
 
 #if defined (ACE_HAS_MONITOR_POINTS) && (ACE_HAS_MONITOR_POINTS == 1)
@@ -1285,7 +1284,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::enqueue_tail_i (ACE_Message_Block
   if (this->signal_dequeue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Actually put the node(s) at the head (no locking)
@@ -1329,7 +1328,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::enqueue_head_i (ACE_Message_Block
   if (this->signal_dequeue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Actually put the node at its proper position relative to its
@@ -1400,7 +1399,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::enqueue_i (ACE_Message_Block *new
   if (this->signal_dequeue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Actually put the node at its proper position relative to its
@@ -1520,7 +1519,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::dequeue_head_i (ACE_Message_Block
       && this->signal_enqueue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Get the earliest (i.e., FIFO) ACE_Message_Block with the lowest
@@ -1596,7 +1595,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::dequeue_prio_i (ACE_Message_Block
       && this->signal_enqueue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Actually get the last ACE_Message_Block (no locking, so must be
@@ -1645,7 +1644,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::dequeue_tail_i (ACE_Message_Block
       && this->signal_enqueue_waiters () == -1)
     return -1;
   else
-    return ACE_Utils::truncate_cast<int> (this->cur_count_);
+    return static_cast<int> (this->cur_count_);
 }
 
 // Actually get the ACE_Message_Block with the lowest deadline time
@@ -1740,7 +1739,7 @@ ACE_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::peek_dequeue_head (ACE_Message_Bl
     return -1;
 
   first_item = this->head_;
-  return ACE_Utils::truncate_cast<int> (this->cur_count_);
+  return static_cast<int> (this->cur_count_);
 }
 
 template <ACE_SYNCH_DECL, class TIME_POLICY> int
@@ -2441,7 +2440,7 @@ ACE_Dynamic_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::enqueue_i (ACE_Message_Bl
     }
   else
     {
-      return ACE_Utils::truncate_cast<int> (this->cur_count_);
+      return static_cast<int> (this->cur_count_);
     }
 }
 
@@ -2641,7 +2640,7 @@ ACE_Dynamic_Message_Queue<ACE_SYNCH_USE, TIME_POLICY>::dequeue_head_i (ACE_Messa
     }
   else
     {
-      return ACE_Utils::truncate_cast<int> (this->cur_count_);
+      return static_cast<int> (this->cur_count_);
     }
 }
 

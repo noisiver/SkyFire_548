@@ -1,6 +1,3 @@
-#ifndef ACE_EVENT_CPP
-#define ACE_EVENT_CPP
-
 #include "ace/Event.h"
 
 #if !defined (__ACE_INLINE__)
@@ -41,5 +38,3 @@ ACE_Event_T<TIME_POLICY>::ACE_Event_T (int manual_reset,
 }
 
 ACE_END_VERSIONED_NAMESPACE_DECL
-
-#endif

@@ -577,7 +577,7 @@ ACE_Thread_Manager::spawn_i (ACE_THR_FUNC func,
                              void *stack,
                              size_t stack_size,
                              ACE_Task_Base *task,
-                             const char** thr_name)
+                             const char **thr_name)
 {
   // First, threads created by Thread Manager should not be daemon threads.
   // Using assertion is probably a bit too strong.  However, it helps
@@ -692,7 +692,7 @@ ACE_Thread_Manager::spawn (ACE_THR_FUNC func,
                            int grp_id,
                            void *stack,
                            size_t stack_size,
-                           const char** thr_name)
+                           const char **thr_name)
 {
   ACE_TRACE ("ACE_Thread_Manager::spawn");
 
@@ -733,7 +733,7 @@ ACE_Thread_Manager::spawn_n (size_t n,
                              ACE_hthread_t thread_handles[],
                              void *stack[],
                              size_t stack_size[],
-                             const char* thr_name[])
+                             const char *thr_name[])
 {
   ACE_TRACE ("ACE_Thread_Manager::spawn_n");
   ACE_MT (ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, this->lock_, -1));
@@ -776,7 +776,7 @@ ACE_Thread_Manager::spawn_n (ACE_thread_t thread_ids[],
                              size_t stack_size[],
                              ACE_hthread_t thread_handles[],
                              ACE_Task_Base *task,
-                             const char* thr_name[])
+                             const char *thr_name[])
 {
   ACE_TRACE ("ACE_Thread_Manager::spawn_n");
   ACE_MT (ACE_GUARD_RETURN (ACE_Thread_Mutex, ace_mon, this->lock_, -1));
@@ -1487,7 +1487,7 @@ ACE_Thread_Manager::join (ACE_thread_t tid, ACE_THR_FUNC_RETURN *status)
         if (ACE_OS::thr_equal (biter.next ()->thr_id_, tid))
           {
             std::unique_ptr<ACE_Thread_Descriptor_Base> tdbl (biter.advance_and_remove (false));
-            ace_mon.release();
+            ACE_MT (ace_mon.release());
 #ifndef ACE_LACKS_PTHREAD_JOIN
             if (ACE_Thread::join (tdbl->thr_handle_, status) == -1)
               {

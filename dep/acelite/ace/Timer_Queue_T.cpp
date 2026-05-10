@@ -31,7 +31,6 @@ ACE_BEGIN_VERSIONED_NAMESPACE_DECL
 template <class TYPE, class FUNCTOR> ACE_INLINE
 ACE_Timer_Queue_Upcall_Base<TYPE, FUNCTOR>::ACE_Timer_Queue_Upcall_Base (FUNCTOR * upcall_functor)
   : ACE_Abstract_Timer_Queue<TYPE>()
-  , ACE_Copy_Disabled()
   , upcall_functor_(upcall_functor)
   , delete_upcall_functor_ (upcall_functor == 0)
 {
@@ -62,9 +61,9 @@ ACE_Timer_Queue_T<TYPE, FUNCTOR, ACE_LOCK, TIME_POLICY>::gettimeofday()
 }
 
 template <class TYPE, class FUNCTOR, class ACE_LOCK, typename TIME_POLICY> void
-ACE_Timer_Queue_T<TYPE, FUNCTOR, ACE_LOCK, TIME_POLICY>::gettimeofday (ACE_Time_Value (*gettimeofday)())
+ACE_Timer_Queue_T<TYPE, FUNCTOR, ACE_LOCK, TIME_POLICY>::gettimeofday (ACE_Time_Value (*gettimeofday_fn)())
 {
-  this->time_policy_.set_gettimeofday (gettimeofday);
+  this->time_policy_.set_gettimeofday (gettimeofday_fn);
 }
 
 template <class TYPE, class FUNCTOR, class ACE_LOCK, typename TIME_POLICY> ACE_Time_Value *

@@ -1,6 +1,3 @@
-#ifndef ACE_MANUAL_EVENT_CPP
-#define ACE_MANUAL_EVENT_CPP
-
 #include "ace/Manual_Event.h"
 
 #if defined (ACE_HAS_ALLOC_HOOKS)
@@ -17,11 +14,7 @@ ACE_Manual_Event_T<TIME_POLICY>::ACE_Manual_Event_T (
     int type,
     const char *name,
     void *arg)
-  : ACE_Event_T<TIME_POLICY> (1,
-                              initial_state,
-                              type,
-                              ACE_TEXT_CHAR_TO_TCHAR (name),
-                              arg)
+  : ACE_Event_T<TIME_POLICY> (1, initial_state, type, ACE_TEXT_CHAR_TO_TCHAR (name), arg)
 {
 }
 
@@ -32,11 +25,7 @@ ACE_Manual_Event_T<TIME_POLICY>::ACE_Manual_Event_T (
     int type,
     const wchar_t *name,
     void *arg)
-  : ACE_Event_T<TIME_POLICY> (1,
-                              initial_state,
-                              type,
-                              ACE_TEXT_WCHAR_TO_TCHAR (name),
-                              arg)
+  : ACE_Event_T<TIME_POLICY> (1, initial_state, type, ACE_TEXT_WCHAR_TO_TCHAR (name), arg)
 {
 }
 #endif /* ACE_HAS_WCHAR */
@@ -51,5 +40,3 @@ ACE_Manual_Event_T<TIME_POLICY>::dump () const
 }
 
 ACE_END_VERSIONED_NAMESPACE_DECL
-
-#endif
