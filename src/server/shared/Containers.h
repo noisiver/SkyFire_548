@@ -7,6 +7,8 @@
 #define SKYFIRE_CONTAINERS_H
 
 #include "Define.h"
+
+#include <cstdlib>
 #include <list>
 
 namespace Skyfire

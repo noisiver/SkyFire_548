@@ -10,6 +10,12 @@
 #include "utf8.h"
 #include "Util.h"
 
+#include <cstdarg>
+
+#if PLATFORM == PLATFORM_UNIX
+#include <arpa/inet.h>
+#endif
+
 static CRandomSFMT& SfmtRand()
 {
     static thread_local CRandomSFMT sfmtRand;

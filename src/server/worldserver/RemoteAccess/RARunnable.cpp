@@ -17,6 +17,10 @@
 
 #include <cstring>
 
+#if PLATFORM == PLATFORM_UNIX
+#include <arpa/inet.h>
+#endif
+
 namespace
 {
     int LastSocketError()

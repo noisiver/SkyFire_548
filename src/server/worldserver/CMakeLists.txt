@@ -142,6 +142,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/RemoteAccess
   ${CMAKE_CURRENT_SOURCE_DIR}/SFSoap
   ${CMAKE_CURRENT_SOURCE_DIR}/WorldThread
+  ${Boost_INCLUDE_DIRS}
   ${MYSQL_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR}
 )
@@ -181,6 +182,12 @@ target_link_libraries(worldserver
   ${ZLIB_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
 )
+
+if(TARGET Boost::headers)
+  target_link_libraries(worldserver Boost::headers)
+elseif(TARGET Boost::boost)
+  target_link_libraries(worldserver Boost::boost)
+endif()
 
 if( WIN32 )
   if ( MSVC )

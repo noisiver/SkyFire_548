@@ -23,11 +23,12 @@ endif()
 project(Project_Skyfire)
 
 # CMake policies (can not be handled elsewhere)
-if( UNIX )
-# Unix is still operating in legacy mode
-  cmake_policy(SET CMP0005 OLD)
-else()
+if(POLICY CMP0005)
+  cmake_policy(SET CMP0005 NEW)
+endif()
 
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 NEW)
 endif()
 
 # add this options before PROJECT keyword

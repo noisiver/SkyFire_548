@@ -24,6 +24,10 @@
 #include "TargetedMovementGenerator.h"
 #include "WeatherMgr.h"
 
+#if PLATFORM == PLATFORM_UNIX
+#include <arpa/inet.h>
+#endif
+
 class misc_commandscript : public CommandScript
 {
 public:

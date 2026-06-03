@@ -13,6 +13,7 @@
 #include "LogWorker.h"
 #include "Platform/Singleton.h"
 
+#include <cstdarg>
 #include <string>
 
 #define LOGGER_ROOT "root"

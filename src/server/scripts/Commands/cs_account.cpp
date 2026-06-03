@@ -16,6 +16,10 @@ EndScriptData */
 #include "Player.h"
 #include "ScriptMgr.h"
 
+#if PLATFORM == PLATFORM_UNIX
+#include <arpa/inet.h>
+#endif
+
 class account_commandscript : public CommandScript
 {
 public:

@@ -19,6 +19,7 @@
 #include "Errors.h"
 #include "Platform/TimeUtils.h"
 
+#include <cstdarg>
 #include <cmath>
 #include <cstring>
 #include <exception>

@@ -5,6 +5,7 @@
 
 #ifndef _VMAPDEFINITIONS_H
 #define _VMAPDEFINITIONS_H
+#include <cstdio>
 #include <cstring>
 
 #define LIQUID_TILE_SIZE (533.333f / 128.f)

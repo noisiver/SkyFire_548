@@ -20,6 +20,10 @@
 #include "TOTP.h"
 #include <thread>
 
+#if PLATFORM == PLATFORM_UNIX
+#include <arpa/inet.h>
+#endif
+
 #define ChunkSize 2048
 
 enum eAuthCmd
