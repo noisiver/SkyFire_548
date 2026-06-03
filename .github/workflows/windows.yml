@@ -7,64 +7,81 @@ on:
       - 'sql/**'
       
 concurrency:
-  group: ${{ github.head_ref }} || concat(${{ github.ref }}, ${{ github.workflow }})
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 
 env:
-  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
-  BUILD_TYPE: Release
-  REPO_DIR : ${{github.workspace}}
-  BUILD_DIR: ${{github.workspace}}/bin/builddir
+  BUILD_TYPE: RelWithDebInfo
+  BOOST_VERSION: 1.91.0
+  BOOST_ROOT: C:\local\boost_1_91_0
+  OPENSSL_ROOT_DIR: C:\Program Files\OpenSSL
+  OPENSSL_MODULES: C:\Program Files\OpenSSL\bin
+  OPENSSL_LIB_LEGACY: C:\Program Files\OpenSSL\lib\VC\x64\MD\liblegacy.lib
+  REPO_DIR: ${{ github.workspace }}
+  BUILD_DIR: ${{ github.workspace }}\bin\builddir
     
 jobs:
   build:
     runs-on: windows-latest
     
     steps:
-    #git checkout
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
 
     - uses: FranzDiebold/github-env-vars-action@v2
+
     - name: Create Build Environment
+      shell: pwsh
       run: |
-        
-        echo "ARCHIVE_FILENAME=$env:CI_REPOSITORY_NAME-${{matrix.TYPE}}-$env:CI_SHA_SHORT.zip" >> $env:GITHUB_ENV
+        "ARCHIVE_FILENAME=$env:CI_REPOSITORY_NAME-$env:CI_SHA_SHORT.zip" >> $env:GITHUB_ENV
         cmake -E make_directory ${{ env.BUILD_DIR }}
-    # install dependencies
-            
+
     - name: windows dependencies
-      #Sets versions for ACE
-      #env:
-      #  ACE_VERSION: 6.5.11
-      #  ACE_VERSION2: 6_5_11
-
+      shell: pwsh
       run: |
-        #make
         choco install -y make
-        #cmake
-        choco install -y cmake --pre 
-        #openssl
+        choco install -y cmake --pre
         choco install -y openssl --version=4.0.0
-      #git bash shell
-      shell: bash
 
-    #build and install
-    - name: windows build & install
-    
-    
-      env: 
-        OPENSSL_MODULES: C:\Program Files\OpenSSL\bin
-        OPENSSL_LIB_LEGACY: C:\Program Files\OpenSSL\lib\VC\x64\MD\liblegacy.lib
-      
+    - name: Cache Boost
+      id: boost-cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ env.BOOST_ROOT }}
+        key: boost-${{ env.BOOST_VERSION }}-windows
+
+    - name: Install Boost
+      if: steps.boost-cache.outputs.cache-hit != 'true'
+      shell: pwsh
       run: |
-        cd $GITHUB_WORKSPACE
-        mkdir -p build && cd build
-        cmake .. -DTOOLS=ON-A x64
-        cmake --build . --config RelWithDebInfo --parallel 4
-      #git bash shell
-      shell: bash
+        $boostSource = Join-Path $env:RUNNER_TEMP "boost_1_91_0"
+        $boostArchive = Join-Path $env:RUNNER_TEMP "boost_1_91_0.7z"
+        Invoke-WebRequest -Uri "https://archives.boost.io/release/$env:BOOST_VERSION/source/boost_1_91_0.7z" -OutFile $boostArchive
+        7z x $boostArchive "-o$env:RUNNER_TEMP" -y
+        Push-Location $boostSource
+        try {
+          .\bootstrap.bat
+          .\b2.exe install --prefix="$env:BOOST_ROOT" --with-headers -j2
+        } finally {
+          Pop-Location
+        }
+
+    - name: windows configure
+      shell: pwsh
+      run: |
+        cmake -S "$env:GITHUB_WORKSPACE" -B "$env:BUILD_DIR" `
+          -A x64 `
+          -DTOOLS=ON `
+          -DBOOST_ROOT="$env:BOOST_ROOT" `
+          -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
+
+    - name: windows build
+      shell: pwsh
+      run: |
+        cmake --build "$env:BUILD_DIR" --config "$env:BUILD_TYPE" --parallel 4
+
     - name: Create Upload File Name
+      shell: pwsh
       run: |
-          echo "ARCHIVE_FILENAME=${{ github.event.repository.name }}-$(git rev-parse --short HEAD).zip" >> $env:GITHUB_ENV
+        "ARCHIVE_FILENAME=${{ github.event.repository.name }}-$(git rev-parse --short HEAD).zip" >> $env:GITHUB_ENV
       
