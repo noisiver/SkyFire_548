@@ -7,9 +7,8 @@
 #define SF_REALMLIST_H
 
 #include "Common.h"
-#include <ace/INET_Addr.h>
-#include <ace/Null_Mutex.h>
-#include <ace/Singleton.h>
+#include "NetworkAddress.h"
+#include "Platform/Singleton.h"
 
 enum RealmFlags
 {
@@ -29,9 +28,9 @@ struct Realm
 {
     Realm() : icon(0), flag(REALM_FLAG_NONE), timezone(0), m_ID(0),
         allowedSecurityLevel(AccountTypes::SEC_PLAYER), populationLevel(0.0f), gamebuild(0) {}
-    ACE_INET_Addr ExternalAddress;
-    ACE_INET_Addr LocalAddress;
-    ACE_INET_Addr LocalSubnetMask;
+    Skyfire::Net::Address ExternalAddress;
+    Skyfire::Net::Address LocalAddress;
+    Skyfire::Net::Address LocalSubnetMask;
     std::string name;
     uint8 icon;
     RealmFlags flag;
@@ -63,8 +62,8 @@ public:
 
 private:
     void UpdateRealms(bool init = false);
-    void UpdateRealm(uint32 id, const std::string& name, ACE_INET_Addr const& address,
-        ACE_INET_Addr const& localAddr, ACE_INET_Addr const& localSubmask,
+    void UpdateRealm(uint32 id, const std::string& name, Skyfire::Net::Address const& address,
+        Skyfire::Net::Address const& localAddr, Skyfire::Net::Address const& localSubmask,
         uint8 icon, RealmFlags flag, uint8 timezone, AccountTypes allowedSecurityLevel,
         float popu, uint32 build);
 
@@ -73,5 +72,5 @@ private:
     time_t   m_NextUpdateTime;
 };
 
-#define sRealmList ACE_Singleton<RealmList, ACE_Null_Mutex>::instance()
+#define sRealmList Skyfire::Singleton<RealmList, Skyfire::NullMutex>::instance()
 #endif

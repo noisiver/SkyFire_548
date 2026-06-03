@@ -57,7 +57,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/Authentication
   ${CMAKE_CURRENT_SOURCE_DIR}/Realms
   ${CMAKE_CURRENT_SOURCE_DIR}/Server
-  ${ACE_INCLUDE_DIR}
+  ${Boost_INCLUDE_DIRS}
   ${MYSQL_INCLUDE_DIR}
   ${OPENSSL_INCLUDE_DIR}
 )
@@ -80,21 +80,26 @@ target_link_libraries(authserver
   ${MYSQL_LIBRARY}
   ${OPENSSL_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
-  ${ACE_LIBRARY}
 )
+
+if(TARGET Boost::headers)
+  target_link_libraries(authserver Boost::headers)
+elseif(TARGET Boost::boost)
+  target_link_libraries(authserver Boost::boost)
+endif()
 
 if( WIN32 )
   if ( MSVC )
-    #add libcrypto-3 dll to bin Folder
+    #add libcrypto dll to bin Folder
     add_custom_command(TARGET authserver
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_CRYPTO3_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
+    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_CRYPTO_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
     )
 
-    #add libssl-3 dll to bin Folder
+    #add libssl dll to bin Folder
     add_custom_command(TARGET authserver
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_SSL3_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
+    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_SSL_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
     )
 
     #add mysql dll to bin folder
@@ -113,16 +118,16 @@ if( WIN32 )
       COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/authserver.conf.dist ${CMAKE_BINARY_DIR}/bin/
     )
   elseif(CMAKE_C_COMPILER_ID STREQUAL "Clang")
-    #add libcrypto-3 dll to bin Folder
+    #add libcrypto dll to bin Folder
     add_custom_command(TARGET authserver
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_CRYPTO3_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
+    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_CRYPTO_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
     )
 
-    #add libssl-3 dll to bin Folder
+    #add libssl dll to bin Folder
     add_custom_command(TARGET authserver
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_SSL3_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
+    COMMAND ${CMAKE_COMMAND} -E copy ${OPENSSL_SSL_DLL} ${CMAKE_BINARY_DIR}/bin/$(ConfigurationName)/
     )
 
     #add mysql dll to bin folder

@@ -16,8 +16,8 @@
 #include "QueryResult.h"
 #include "SharedDefines.h"
 #include "Timer.h"
+#include "Platform/Singleton.h"
 #include <atomic>
-#include <ace/Singleton.h>
 
 #include <list>
 #include <map>
@@ -863,7 +863,7 @@ private:
     static int32 m_visibility_notify_periodInBGArenas;
 
     // CLI command holder to be thread safe
-    ACE_Based::LockedQueue<CliCommandHolder*, ACE_Thread_Mutex> cliCmdQueue;
+    Skyfire::LockedQueue<CliCommandHolder*, Skyfire::Mutex> cliCmdQueue;
 
     // scheduled reset times
     time_t m_NextDailyQuestReset;
@@ -878,7 +878,7 @@ private:
 
     // sessions that are added async
     void AddSession_(WorldSession* s);
-    ACE_Based::LockedQueue<WorldSession*, ACE_Thread_Mutex> addSessQueue;
+    Skyfire::LockedQueue<WorldSession*, Skyfire::Mutex> addSessQueue;
 
     // used versions
     std::string m_DBVersion;
@@ -893,7 +893,7 @@ private:
     void LoadCharacterNameData();
 
     void ProcessQueryCallbacks();
-    ACE_Future_Set<PreparedQueryResult> m_realmCharCallbacks;
+    std::vector<PreparedQueryResultFuture> m_realmCharCallbacks;
 };
 
 typedef std::map<uint32, std::string> RealmNameMap;
@@ -901,6 +901,6 @@ typedef std::map<uint32, std::string> RealmNameMap;
 extern RealmNameMap realmNameStore;
 extern uint32 realmID;
 
-#define sWorld ACE_Singleton<World, ACE_Null_Mutex>::instance()
+#define sWorld Skyfire::Singleton<World, Skyfire::NullMutex>::instance()
 #endif
 /// @}

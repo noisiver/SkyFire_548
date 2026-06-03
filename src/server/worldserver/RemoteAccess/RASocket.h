@@ -12,26 +12,31 @@
 
 #include "Common.h"
 
-#include <ace/SOCK_Acceptor.h>
-#include <ace/SOCK_Stream.h>
-#include <ace/Svc_Handler.h>
-#include <ace/Synch_Traits.h>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <queue>
+#include <thread>
+
+#if PLATFORM == PLATFORM_WINDOWS
+typedef SOCKET RASocketHandle;
+#else
+typedef int RASocketHandle;
+#endif
 
 /// Remote Administration socket
-class RASocket : public ACE_Svc_Handler<ACE_SOCK_STREAM, ACE_MT_SYNCH>
+class RASocket
 {
 public:
-    RASocket();
+    RASocket(RASocketHandle socket, std::string const& remoteAddress);
     virtual ~RASocket() { }
 
-    virtual int svc() OVERRIDE;
-    virtual int open(void* = 0) OVERRIDE;
-    virtual int handle_close(ACE_HANDLE = ACE_INVALID_HANDLE, ACE_Reactor_Mask = ACE_Event_Handler::ALL_EVENTS_MASK) OVERRIDE;
+    void start();
 
 private:
+    int svc();
+    void close();
     int recv_line(std::string& outLine);
-    int recv_line(ACE_Message_Block& buffer);
     int process_command(const std::string& command);
     int authenticate();
     int subnegotiate();     ///< Used by telnet protocol RFC 854 / 855
@@ -43,8 +48,14 @@ private:
     static void commandFinished(void* callbackArg, bool success);
 
 private:
+    RASocketHandle _socket;
+    std::string _remoteAddress;
     uint8 _minLevel; ///< Minimum security level required to connect
     std::atomic<bool> _commandExecuting;
+    std::mutex _commandLock;
+    std::condition_variable _commandCondition;
+    std::queue<std::string> _commandOutput;
+    bool _commandComplete;
 };
 
 #endif

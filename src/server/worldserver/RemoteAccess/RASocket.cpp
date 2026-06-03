@@ -16,59 +16,121 @@
 #include "SRP6.h"
 #include "Util.h"
 #include "World.h"
+#include <chrono>
+#include <cerrno>
+#include <cstring>
+#include <thread>
 
-RASocket::RASocket() : _minLevel(3), _commandExecuting(false)
+namespace
+{
+    int LastSocketError()
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        return WSAGetLastError();
+#else
+        return errno;
+#endif
+    }
+
+    void CloseSocket(RASocketHandle socket)
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        closesocket(socket);
+#else
+        close(socket);
+#endif
+    }
+
+    bool IsValidSocket(RASocketHandle socket)
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        return socket != INVALID_SOCKET;
+#else
+        return socket >= 0;
+#endif
+    }
+
+    int SendSocket(RASocketHandle socket, char const* data, size_t length)
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        return ::send(socket, data, int(length), 0);
+#elif defined(MSG_NOSIGNAL)
+        return int(::send(socket, data, length, MSG_NOSIGNAL));
+#else
+        return int(::send(socket, data, length, 0));
+#endif
+    }
+
+    int RecvSocket(RASocketHandle socket, char* data, size_t length)
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        return ::recv(socket, data, int(length), 0);
+#else
+        return int(::recv(socket, data, length, 0));
+#endif
+    }
+
+    void SetRecvTimeout(RASocketHandle socket, uint32 milliseconds)
+    {
+#if PLATFORM == PLATFORM_WINDOWS
+        DWORD timeout = milliseconds;
+        setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+#else
+        timeval timeout;
+        timeout.tv_sec = milliseconds / 1000;
+        timeout.tv_usec = (milliseconds % 1000) * 1000;
+        setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+#endif
+    }
+}
+
+RASocket::RASocket(RASocketHandle socket, std::string const& remoteAddress) : _socket(socket), _remoteAddress(remoteAddress), _minLevel(3), _commandExecuting(false), _commandComplete(false)
 {
     _minLevel = uint8(sConfigMgr->GetIntDefault("RA.MinLevel", 3));
 }
 
-int RASocket::open(void*)
+void RASocket::start()
 {
-    ACE_INET_Addr remoteAddress;
-
-    if (peer().get_remote_addr(remoteAddress) == -1)
+    std::thread([this]
     {
-        SF_LOG_ERROR("server.worldserver", "RASocket::open: peer().get_remote_addr error is %s", ACE_OS::strerror(errno));
-        return -1;
-    }
-
-    SF_LOG_INFO("commands.ra", "Incoming connection from %s", remoteAddress.get_host_addr());
-
-    return activate();
+        svc();
+        close();
+        delete this;
+    }).detach();
 }
 
-int RASocket::handle_close(ACE_HANDLE /*handle*/, ACE_Reactor_Mask /*mask*/)
+void RASocket::close()
 {
     SF_LOG_INFO("commands.ra", "Closing connection");
-    peer().close_reader();
-    wait();
-    // While the above wait() will wait for the ::svc() to finish, it will not wait for the async event
-    // RASocket::commandfinished to be completed. Calling destroy() before the latter function ends
-    // will lead to using a freed pointer -> crash.
-    while (_commandExecuting)
-        ACE_OS::sleep(1);
 
-    destroy();
-    return 0;
+    if (IsValidSocket(_socket))
+    {
+        CloseSocket(_socket);
+#if PLATFORM == PLATFORM_WINDOWS
+        _socket = INVALID_SOCKET;
+#else
+        _socket = -1;
+#endif
+    }
+
+    while (_commandExecuting)
+        std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 int RASocket::send(const std::string& line)
 {
-#ifdef MSG_NOSIGNAL
-    ssize_t n = peer().send(line.c_str(), line.length(), MSG_NOSIGNAL);
-#else
-    ssize_t n = peer().send(line.c_str(), line.length());
-#endif // MSG_NOSIGNAL
+    int n = SendSocket(_socket, line.c_str(), line.length());
 
-    return n == ssize_t(line.length()) ? 0 : -1;
+    return n == int(line.length()) ? 0 : -1;
 }
 
-int RASocket::recv_line(ACE_Message_Block& buffer)
+int RASocket::recv_line(std::string& out_line)
 {
+    out_line.clear();
     char byte;
     for (;;)
     {
-        ssize_t n = peer().recv(&byte, sizeof(byte));
+        int n = RecvSocket(_socket, &byte, sizeof(byte));
 
         if (n < 0)
             return -1;
@@ -80,46 +142,15 @@ int RASocket::recv_line(ACE_Message_Block& buffer)
             return -1;
         }
 
-        ACE_ASSERT(n == sizeof(byte));
+        ASSERT(n == sizeof(byte));
 
         if (byte == '\n')
             break;
         else if (byte == '\r') /* Ignore CR */
             continue;
-        else if (buffer.copy(&byte, sizeof(byte)) == -1)
-            return -1;
+        else
+            out_line += byte;
     }
-
-    const char nullTerm = '\0';
-    if (buffer.copy(&nullTerm, sizeof(nullTerm)) == -1)
-        return -1;
-
-    return 0;
-}
-
-int RASocket::recv_line(std::string& out_line)
-{
-    char buf[4096];
-
-    ACE_Data_Block db(sizeof(buf),
-        ACE_Message_Block::MB_DATA,
-        buf,
-        0,
-        0,
-        ACE_Message_Block::DONT_DELETE,
-        0);
-
-    ACE_Message_Block message_block(&db,
-        ACE_Message_Block::DONT_DELETE,
-        0);
-
-    if (recv_line(message_block) == -1)
-    {
-        SF_LOG_DEBUG("commands.ra", "Recv error %s", ACE_OS::strerror(errno));
-        return -1;
-    }
-
-    out_line = message_block.rd_ptr();
 
     return 0;
 }
@@ -138,29 +169,36 @@ int RASocket::process_command(const std::string& command)
     }
 
     _commandExecuting = true;
+    {
+        std::lock_guard<std::mutex> guard(_commandLock);
+        _commandComplete = false;
+        std::queue<std::string> empty;
+        std::swap(_commandOutput, empty);
+    }
+
     CliCommandHolder* cmd = new CliCommandHolder(this, command.c_str(), &RASocket::zprint, &RASocket::commandFinished);
     sWorld->QueueCliCommand(cmd);
 
     // wait for result
-    ACE_Message_Block* mb;
     for (;;)
     {
-        if (getq(mb) == -1)
-            return -1;
+        std::string output;
 
-        if (mb->msg_type() == ACE_Message_Block::MB_BREAK)
         {
-            mb->release();
-            break;
+            std::unique_lock<std::mutex> lock(_commandLock);
+            _commandCondition.wait(lock, [this] { return !_commandOutput.empty() || _commandComplete; });
+
+            if (!_commandOutput.empty())
+            {
+                output = _commandOutput.front();
+                _commandOutput.pop();
+            }
+            else if (_commandComplete)
+                break;
         }
 
-        if (send(std::string(mb->rd_ptr(), mb->length())) == -1)
-        {
-            mb->release();
+        if (!output.empty() && send(output) == -1)
             return -1;
-        }
-
-        mb->release();
     }
 
     return 0;
@@ -256,24 +294,10 @@ int RASocket::subnegotiate()
 {
     char buf[1024];
 
-    ACE_Data_Block db(sizeof(buf),
-        ACE_Message_Block::MB_DATA,
-        buf,
-        0,
-        0,
-        ACE_Message_Block::DONT_DELETE,
-        0);
-
-    ACE_Message_Block message_block(&db,
-        ACE_Message_Block::DONT_DELETE,
-        0);
-
-    const size_t recv_size = message_block.space();
-
     // Wait a maximum of 1000ms for negotiation packet - not all telnet clients may send it
-    ACE_Time_Value waitTime = ACE_Time_Value(1);
-    const ssize_t n = peer().recv(message_block.wr_ptr(),
-        recv_size, &waitTime);
+    SetRecvTimeout(_socket, 1000);
+    const int n = RecvSocket(_socket, buf, sizeof(buf));
+    SetRecvTimeout(_socket, 0);
 
     if (n <= 0)
         return int(n);
@@ -323,11 +347,7 @@ int RASocket::subnegotiate()
     //! Just send back end of subnegotiation packet
     uint8 const reply[2] = { 0xFF, 0xF0 };
 
-#ifdef MSG_NOSIGNAL
-    return int(peer().send(reply, 2, MSG_NOSIGNAL));
-#else
-    return int(peer().send(reply, 2));
-#endif // MSG_NOSIGNAL
+    return SendSocket(_socket, reinterpret_cast<char const*>(reply), 2);
 }
 
 int RASocket::svc(void)
@@ -374,15 +394,12 @@ void RASocket::zprint(void* callbackArg, const char* szText)
     RASocket* socket = static_cast<RASocket*>(callbackArg);
     size_t sz = strlen(szText);
 
-    ACE_Message_Block* mb = new ACE_Message_Block(sz);
-    mb->copy(szText, sz);
-
-    ACE_Time_Value tv = ACE_Time_Value::zero;
-    if (socket->putq(mb, &tv) == -1)
     {
-        SF_LOG_DEBUG("commands.ra", "Failed to enqueue message, queue is full or closed. Error is %s", ACE_OS::strerror(errno));
-        mb->release();
+        std::lock_guard<std::mutex> guard(socket->_commandLock);
+        socket->_commandOutput.push(std::string(szText, sz));
     }
+
+    socket->_commandCondition.notify_one();
 }
 
 void RASocket::commandFinished(void* callbackArg, bool /*success*/)
@@ -392,17 +409,11 @@ void RASocket::commandFinished(void* callbackArg, bool /*success*/)
 
     RASocket* socket = static_cast<RASocket*>(callbackArg);
 
-    ACE_Message_Block* mb = new ACE_Message_Block();
-
-    mb->msg_type(ACE_Message_Block::MB_BREAK);
-
-    // the message is 0 size control message to tell that command output is finished
-    // hence we don't put timeout, because it shouldn't increase queue size and shouldn't block
-    if (socket->putq(mb->duplicate()) == -1)
-        // getting here is bad, command can't be marked as complete
-        SF_LOG_DEBUG("commands.ra", "Failed to enqueue command end message. Error is %s", ACE_OS::strerror(errno));
-
-    mb->release();
+    {
+        std::lock_guard<std::mutex> guard(socket->_commandLock);
+        socket->_commandComplete = true;
+    }
 
     socket->_commandExecuting = false;
+    socket->_commandCondition.notify_one();
 }

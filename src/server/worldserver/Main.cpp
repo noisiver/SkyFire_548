@@ -7,7 +7,6 @@
 /// @{
 /// \file
 #pragma comment (lib, "Crypt32")
-#include <ace/Version.h>
 #include <openssl/crypto.h>
 #include <openssl/opensslv.h>
 #include <openssl/provider.h>
@@ -77,7 +76,7 @@ uint32 realmID = -1;                                        ///< Id of the realm
 void usage(const char* prog)
 {
     printf("Usage:\n");
-    printf(" %s [<options>]\n");
+    printf(" %s [<options>]\n", prog);
     printf("    -c config_file                   use config_file as configuration file\n");
     printf("    --no_use_config_database_info    dont use database login info from config file\n");
     printf("    --db_host                        sets the database host, requires: --no_use_config_database_info\n");
@@ -290,8 +289,6 @@ extern int main(int argc, char** argv)
         return 1;
 
     OSSL_PROVIDER_unload(legacy_provider);
-
-    SF_LOG_INFO("server.worldserver", "Using ACE version: %s", ACE_VERSION);
 
     if (noUseConfigDatabaseInfo == true)
     {

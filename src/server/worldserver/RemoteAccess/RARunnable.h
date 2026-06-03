@@ -12,17 +12,12 @@
 
 #include "Common.h"
 
-#include <ace/Reactor.h>
-
-class RARunnable : public ACE_Based::Runnable
+class RARunnable
 {
 public:
-    RARunnable();
-    virtual ~RARunnable();
-    void run() OVERRIDE;
-
-private:
-    ACE_Reactor* m_Reactor;
+    RARunnable() { }
+    virtual ~RARunnable() { }
+    void Run();
 };
 
 #endif /* _SKYFIRE_RARUNNABLE_H_ */

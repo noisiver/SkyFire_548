@@ -5,33 +5,36 @@
 
 #include "Common.h"
 #include "Errors.h" // for ASSERT
+#include "Platform/TimeUtils.h"
 #include "sfmt.h"
 #include "utf8.h"
 #include "Util.h"
-#include <ace/TSS_T.h>
 
-typedef ACE_TSS<CRandomSFMT> CRandomSFMTTSS;
-static CRandomSFMTTSS sfmtRand;
+static CRandomSFMT& SfmtRand()
+{
+    static thread_local CRandomSFMT sfmtRand;
+    return sfmtRand;
+}
 
 float frand(float min, float max)
 {
     ASSERT(max >= min);
-    return float(sfmtRand->Random() * (max - min) + min);
+    return float(SfmtRand().Random() * (max - min) + min);
 }
 
 int32 rand32()
 {
-    return int32(sfmtRand->BRandom());
+    return int32(SfmtRand().BRandom());
 }
 
 double rand_norm(void)
 {
-    return sfmtRand->Random();
+    return SfmtRand().Random();
 }
 
 double rand_chance(void)
 {
-    return sfmtRand->Random() * 100.0;
+    return SfmtRand().Random() * 100.0;
 }
 
 Tokenizer::Tokenizer(const std::string& src, const char sep, uint32 vectorReserve)
@@ -190,7 +193,7 @@ uint32 TimeStringToSecs(const std::string& timestring)
 std::string TimeToTimestampStr(time_t t)
 {
     tm aTm;
-    ACE_OS::localtime_r(&t, &aTm);
+    Skyfire::LocalTime(t, aTm);
     //       YYYY   year
     //       MM     month (2 digits 01-12)
     //       DD     day (2 digits 01-31)
@@ -213,17 +216,17 @@ bool IsIPAddress(char const* ipaddress)
     return inet_addr(ipaddress) != INADDR_NONE;
 }
 
-std::string GetAddressString(ACE_INET_Addr const& addr)
+std::string GetAddressString(Skyfire::Net::Address const& addr)
 {
-    char buf[ACE_MAX_FULLY_QUALIFIED_NAME_LEN + 16];
-    addr.addr_to_string(buf, ACE_MAX_FULLY_QUALIFIED_NAME_LEN + 16);
-    return buf;
+    std::ostringstream ss;
+    ss << addr.GetHost() << ':' << addr.GetPort();
+    return ss.str();
 }
 
-bool IsIPAddrInNetwork(ACE_INET_Addr const& net, ACE_INET_Addr const& addr, ACE_INET_Addr const& subnetMask)
+bool IsIPAddrInNetwork(Skyfire::Net::Address const& net, Skyfire::Net::Address const& addr, Skyfire::Net::Address const& subnetMask)
 {
-    uint32 mask = subnetMask.get_ip_address();
-    if ((net.get_ip_address() & mask) == (addr.get_ip_address() & mask))
+    uint32 mask = subnetMask.ToIPv4NetworkOrder();
+    if ((net.ToIPv4NetworkOrder() & mask) == (addr.ToIPv4NetworkOrder() & mask))
         return true;
     return false;
 }

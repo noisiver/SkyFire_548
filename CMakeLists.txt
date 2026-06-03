@@ -1,5 +1,5 @@
 #
-# This file is part of Project SkyFire https://www.projectskyfire.org. 
+# This file is part of Project SkyFire https://www.projectskyfire.org.
 # See COPYRIGHT file for Copyright information
 #
 
@@ -27,7 +27,7 @@ if( UNIX )
 # Unix is still operating in legacy mode
   cmake_policy(SET CMP0005 OLD)
 else()
-  
+
 endif()
 
 # add this options before PROJECT keyword
@@ -39,7 +39,7 @@ set(CMAKE_SKIP_BUILD_RPATH 0)
 set(CMAKE_BUILD_WITH_INSTALL_RPATH 0)
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH 1)
-	   
+
 # set macro-directory
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake/macros")
 
@@ -63,16 +63,33 @@ endif()
 
 include(CheckPlatform)
 
-if (MSVC)
-  set(OPENSSL_EXPECTED_VERSION 3.5.0)
-else()
-  set(OPENSSL_EXPECTED_VERSION 3.2.2)
+set(OPENSSL_EXPECTED_VERSION 4.0.0)
+
+set(BOOST_EXPECTED_VERSION 1.91.0)
+
+if(BOOST_ROOT)
+  file(TO_CMAKE_PATH "${BOOST_ROOT}" BOOST_ROOT_HINT)
+elseif(DEFINED ENV{BOOST_ROOT})
+  file(TO_CMAKE_PATH "$ENV{BOOST_ROOT}" BOOST_ROOT_HINT)
 endif()
 
-set(ACE_EXPECTED_VERSION 8.0.1)
+if(BOOST_ROOT_HINT)
+  list(APPEND CMAKE_PREFIX_PATH "${BOOST_ROOT_HINT}")
+
+  if(NOT Boost_DIR)
+    file(GLOB BOOST_CONFIG_DIRS LIST_DIRECTORIES true
+      "${BOOST_ROOT_HINT}/lib*/cmake/Boost-${BOOST_EXPECTED_VERSION}"
+    )
+
+    if(BOOST_CONFIG_DIRS)
+      list(SORT BOOST_CONFIG_DIRS ORDER DESCENDING)
+      list(GET BOOST_CONFIG_DIRS 0 Boost_DIR)
+    endif()
+  endif()
+endif()
 
 find_package(PCHSupport)
-find_package(ACE REQUIRED)
+find_package(Boost ${BOOST_EXPECTED_VERSION} REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 find_package(MySQL REQUIRED)
@@ -82,7 +99,7 @@ if( UNIX )
   find_package(ZLIB)
   find_package(BZip2)
   find_package(Jemalloc)
-  
+
   if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch")
     find_package(sse2neon)
   endif()
