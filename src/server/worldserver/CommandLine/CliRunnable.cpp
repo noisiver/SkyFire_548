@@ -101,21 +101,6 @@ void commandFinished(void*, bool /*success*/)
     fflush(stdout);
 }
 
-#ifdef linux
-// Non-blocking keypress detector, when return pressed, return 1, else always return 0
-int kb_hit_return()
-{
-    struct timeval tv;
-    fd_set fds;
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds);
-    select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv);
-    return FD_ISSET(STDIN_FILENO, &fds);
-}
-#endif
-
 /// %Thread start
 void CliRunnable::Run()
 {
