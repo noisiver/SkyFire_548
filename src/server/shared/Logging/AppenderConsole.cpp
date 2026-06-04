@@ -7,6 +7,10 @@
 #include "Config.h"
 #include "Util.h"
 
+#if PLATFORM == PLATFORM_WINDOWS
+#include <Windows.h>
+#endif
+
 #include <sstream>
 
 AppenderConsole::AppenderConsole(uint8 id, std::string const& name, LogLevel level, AppenderFlags flags) :

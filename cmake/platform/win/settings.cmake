@@ -7,6 +7,9 @@
 set(BZIP2_LIBRARIES "bzip2")
 set(ZLIB_LIBRARIES "zlib")
 
+set(SKYFIRE_WINDOWS_TARGET_VERSION "0x0601" CACHE STRING "Minimum Windows API target version")
+add_definitions(-D_WIN32_WINNT=${SKYFIRE_WINDOWS_TARGET_VERSION})
+
 # We require at least Visual Studio 16.6 2019(aka 16.6) which has version nr 1926
 IF(NOT FORCE_UNSUPPORTED_COMPILER AND MSVC_VERSION LESS 1926)
   # MSVC 1925 contains internal compiler bug.

@@ -6,7 +6,31 @@
 #include "DelayExecutor.h"
 #include "Platform/Singleton.h"
 
+#include <boost/asio/executor_work_guard.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
+
+#include <mutex>
+#include <thread>
+#include <vector>
+
+struct DelayExecutor::Impl
+{
+    typedef boost::asio::executor_work_guard<boost::asio::io_context::executor_type> WorkGuard;
+
+    Impl()
+        : activated(false)
+    {
+    }
+
+    boost::asio::io_context ioContext;
+    std::unique_ptr<WorkGuard> workGuard;
+    std::unique_ptr<DelayTask> preSvcHook;
+    std::unique_ptr<DelayTask> postSvcHook;
+    std::vector<std::thread> threads;
+    std::mutex stateLock;
+    bool activated;
+};
 
 DelayExecutor* DelayExecutor::instance()
 {
@@ -14,7 +38,7 @@ DelayExecutor* DelayExecutor::instance()
 }
 
 DelayExecutor::DelayExecutor()
-    : activated_(false) { }
+    : impl_(new Impl) { }
 
 DelayExecutor::~DelayExecutor()
 {
@@ -24,35 +48,35 @@ DelayExecutor::~DelayExecutor()
 int DelayExecutor::deactivate()
 {
     {
-        std::lock_guard<std::mutex> guard(state_lock_);
+        std::lock_guard<std::mutex> guard(impl_->stateLock);
 
-        if (!activated_)
+        if (!impl_->activated)
             return -1;
 
-        activated_ = false;
-        work_guard_.reset();
+        impl_->activated = false;
+        impl_->workGuard.reset();
     }
 
-    for (std::thread& thread : threads_)
+    for (std::thread& thread : impl_->threads)
         if (thread.joinable())
             thread.join();
 
-    threads_.clear();
-    pre_svc_hook_.reset();
-    post_svc_hook_.reset();
+    impl_->threads.clear();
+    impl_->preSvcHook.reset();
+    impl_->postSvcHook.reset();
 
     return 0;
 }
 
 int DelayExecutor::svc()
 {
-    if (pre_svc_hook_)
-        pre_svc_hook_->call();
+    if (impl_->preSvcHook)
+        impl_->preSvcHook->call();
 
-    io_context_.run();
+    impl_->ioContext.run();
 
-    if (post_svc_hook_)
-        post_svc_hook_->call();
+    if (impl_->postSvcHook)
+        impl_->postSvcHook->call();
 
     return 0;
 }
@@ -65,17 +89,17 @@ int DelayExecutor::start(int num_threads, std::unique_ptr<DelayTask> pre_svc_hoo
     if (num_threads < 1)
         return -1;
 
-    pre_svc_hook_ = std::move(pre_svc_hook);
-    post_svc_hook_ = std::move(post_svc_hook);
-    io_context_.restart();
-    work_guard_.reset(new WorkGuard(boost::asio::make_work_guard(io_context_)));
+    impl_->preSvcHook = std::move(pre_svc_hook);
+    impl_->postSvcHook = std::move(post_svc_hook);
+    impl_->ioContext.restart();
+    impl_->workGuard.reset(new Impl::WorkGuard(boost::asio::make_work_guard(impl_->ioContext)));
 
     activated(true);
 
     try
     {
         for (int i = 0; i < num_threads; ++i)
-            threads_.push_back(std::thread(&DelayExecutor::svc, this));
+            impl_->threads.push_back(std::thread(&DelayExecutor::svc, this));
     }
     catch (...)
     {
@@ -92,13 +116,13 @@ int DelayExecutor::execute(std::unique_ptr<DelayTask> new_req)
         return -1;
 
     {
-        std::lock_guard<std::mutex> guard(state_lock_);
+        std::lock_guard<std::mutex> guard(impl_->stateLock);
 
-        if (!activated_)
+        if (!impl_->activated)
             return -1;
     }
 
-    boost::asio::post(io_context_,
+    boost::asio::post(impl_->ioContext,
         [task = std::move(new_req)]() mutable
         {
             task->call();
@@ -109,12 +133,12 @@ int DelayExecutor::execute(std::unique_ptr<DelayTask> new_req)
 
 bool DelayExecutor::activated()
 {
-    std::lock_guard<std::mutex> guard(state_lock_);
-    return activated_;
+    std::lock_guard<std::mutex> guard(impl_->stateLock);
+    return impl_->activated;
 }
 
 void DelayExecutor::activated(bool s)
 {
-    std::lock_guard<std::mutex> guard(state_lock_);
-    activated_ = s;
+    std::lock_guard<std::mutex> guard(impl_->stateLock);
+    impl_->activated = s;
 }

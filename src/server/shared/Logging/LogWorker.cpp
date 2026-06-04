@@ -5,24 +5,46 @@
 
 #include "LogWorker.h"
 
+#include <boost/asio/executor_work_guard.hpp>
+#include <boost/asio/io_context.hpp>
 #include <boost/asio/post.hpp>
 
-LogWorker::LogWorker()
-    : m_ioContext(), m_workGuard(new WorkGuard(boost::asio::make_work_guard(m_ioContext))),
-    m_thread(&LogWorker::svc, this), m_active(true)
+#include <mutex>
+#include <thread>
+
+struct LogWorker::Impl
 {
+    typedef boost::asio::executor_work_guard<boost::asio::io_context::executor_type> WorkGuard;
+
+    Impl()
+        : ioContext(), workGuard(new WorkGuard(boost::asio::make_work_guard(ioContext))),
+        active(true)
+    {
+    }
+
+    boost::asio::io_context ioContext;
+    std::unique_ptr<WorkGuard> workGuard;
+    std::mutex queueLock;
+    std::thread thread;
+    bool active;
+};
+
+LogWorker::LogWorker()
+    : m_impl(new Impl)
+{
+    m_impl->thread = std::thread(&LogWorker::svc, this);
 }
 
 LogWorker::~LogWorker()
 {
     {
-        std::lock_guard<std::mutex> guard(m_queueLock);
-        m_active = false;
-        m_workGuard.reset();
+        std::lock_guard<std::mutex> guard(m_impl->queueLock);
+        m_impl->active = false;
+        m_impl->workGuard.reset();
     }
 
-    if (m_thread.joinable())
-        m_thread.join();
+    if (m_impl->thread.joinable())
+        m_impl->thread.join();
 }
 
 int LogWorker::enqueue(LogOperation* op)
@@ -31,13 +53,13 @@ int LogWorker::enqueue(LogOperation* op)
         return -1;
 
     {
-        std::lock_guard<std::mutex> guard(m_queueLock);
+        std::lock_guard<std::mutex> guard(m_impl->queueLock);
 
-        if (!m_active)
+        if (!m_impl->active)
             return -1;
     }
 
-    boost::asio::post(m_ioContext,
+    boost::asio::post(m_impl->ioContext,
         [op]
         {
             op->call();
@@ -49,6 +71,6 @@ int LogWorker::enqueue(LogOperation* op)
 
 int LogWorker::svc()
 {
-    m_ioContext.run();
+    m_impl->ioContext.run();
     return 0;
 }
