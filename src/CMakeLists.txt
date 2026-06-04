@@ -10,3 +10,7 @@ if(TOOLS)
   add_subdirectory(tools)
 endif(TOOLS)
 
+if(SKYFIRE_BUILD_TESTS)
+  add_subdirectory(tests)
+endif()
+

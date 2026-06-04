@@ -56,6 +56,10 @@ include(CheckIncludeFiles)
 # set default buildoptions and print them
 include(cmake/options.cmake)
 
+if(SKYFIRE_BUILD_TESTS)
+  enable_testing()
+endif()
+
 # turn off PCH totally if enabled (hidden setting, mainly for devs)
 if( NOPCH )
   set(USE_COREPCH 0)

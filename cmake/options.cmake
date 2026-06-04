@@ -14,4 +14,4 @@ option(WITHOUT_GIT        "Disable the GIT testing routines"                    
 option(AUTH_SERVER        "Build authserver"                                            1)
 option(WITH_CXX_23_STD    "Use c++23 standard"                                          1)
 option(WITH_CXX_DRAFT_STD "Use c++ draft standard"                                      0)
-
+option(SKYFIRE_BUILD_TESTS "Build SkyFire developer test binaries"                      0)

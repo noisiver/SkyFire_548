@@ -26,20 +26,7 @@ int DatabaseWorker::svc()
     if (!m_queue)
         return -1;
 
-    SQLOperation* request = NULL;
-    while (1)
-    {
-        request = m_queue->dequeue();
-        if (!request)
-            break;
-
-        request->SetConnection(m_conn);
-        request->call();
-
-        delete request;
-    }
-
-    return 0;
+    return m_queue->run(m_conn);
 }
 
 int DatabaseWorker::wait()
