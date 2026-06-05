@@ -84,7 +84,7 @@ namespace
                     SF_LOG_INFO("commands.ra", "Incoming connection from %s", remote.c_str());
 
                     std::unique_ptr<RASocketHandle> socketHandle(new RASocketHandle(std::move(*clientSocket)));
-                    (new RASocket(ioContext, std::move(socketHandle), remote))->start();
+                    std::make_shared<RASocket>(ioContext, std::move(socketHandle), remote)->start();
                 }
 
                 if (!World::IsStopped())
