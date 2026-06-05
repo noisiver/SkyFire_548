@@ -5,13 +5,11 @@
 
 #include "DelayExecutor.h"
 #include "Platform/Singleton.h"
-#include "Threading/BoostAsioWork.h"
-
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/post.hpp>
+#include "Threading/BoostAsioExecutor.h"
 
 #include <mutex>
 #include <thread>
+#include <utility>
 #include <vector>
 
 struct DelayExecutor::Impl
@@ -21,8 +19,7 @@ struct DelayExecutor::Impl
     {
     }
 
-    boost::asio::io_context ioContext;
-    std::unique_ptr<Skyfire::Asio::IoContextWorkGuard> workGuard;
+    Skyfire::Asio::IoContextExecutor executor;
     std::unique_ptr<DelayTask> preSvcHook;
     std::unique_ptr<DelayTask> postSvcHook;
     std::vector<std::thread> threads;
@@ -52,7 +49,7 @@ int DelayExecutor::deactivate()
             return -1;
 
         impl_->activated = false;
-        Skyfire::Asio::ResetWorkGuard(impl_->workGuard);
+        impl_->executor.ResetWork();
     }
 
     for (std::thread& thread : impl_->threads)
@@ -71,7 +68,7 @@ int DelayExecutor::svc()
     if (impl_->preSvcHook)
         impl_->preSvcHook->call();
 
-    impl_->ioContext.run();
+    impl_->executor.Run();
 
     if (impl_->postSvcHook)
         impl_->postSvcHook->call();
@@ -89,8 +86,8 @@ int DelayExecutor::start(int num_threads, std::unique_ptr<DelayTask> pre_svc_hoo
 
     impl_->preSvcHook = std::move(pre_svc_hook);
     impl_->postSvcHook = std::move(post_svc_hook);
-    impl_->ioContext.restart();
-    impl_->workGuard = Skyfire::Asio::MakeIoContextWorkGuard(impl_->ioContext);
+    impl_->executor.Restart();
+    impl_->executor.KeepAlive();
 
     activated(true);
 
@@ -120,7 +117,7 @@ int DelayExecutor::execute(std::unique_ptr<DelayTask> new_req)
             return -1;
     }
 
-    boost::asio::post(impl_->ioContext,
+    impl_->executor.Post(
         [task = std::move(new_req)]() mutable
         {
             task->call();

@@ -4,10 +4,7 @@
 */
 
 #include "LogWorker.h"
-#include "Threading/BoostAsioWork.h"
-
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/post.hpp>
+#include "Threading/BoostAsioExecutor.h"
 
 #include <mutex>
 #include <thread>
@@ -15,13 +12,12 @@
 struct LogWorker::Impl
 {
     Impl()
-        : ioContext(), workGuard(Skyfire::Asio::MakeIoContextWorkGuard(ioContext)),
-        active(true)
+        : executor(), active(true)
     {
+        executor.KeepAlive();
     }
 
-    boost::asio::io_context ioContext;
-    std::unique_ptr<Skyfire::Asio::IoContextWorkGuard> workGuard;
+    Skyfire::Asio::IoContextExecutor executor;
     std::mutex queueLock;
     std::thread thread;
     bool active;
@@ -38,7 +34,7 @@ LogWorker::~LogWorker()
     {
         std::lock_guard<std::mutex> guard(m_impl->queueLock);
         m_impl->active = false;
-        Skyfire::Asio::ResetWorkGuard(m_impl->workGuard);
+        m_impl->executor.ResetWork();
     }
 
     if (m_impl->thread.joinable())
@@ -57,7 +53,7 @@ int LogWorker::enqueue(LogOperation* op)
             return -1;
     }
 
-    boost::asio::post(m_impl->ioContext,
+    m_impl->executor.Post(
         [op]
         {
             op->call();
@@ -69,6 +65,6 @@ int LogWorker::enqueue(LogOperation* op)
 
 int LogWorker::svc()
 {
-    m_impl->ioContext.run();
+    m_impl->executor.Run();
     return 0;
 }

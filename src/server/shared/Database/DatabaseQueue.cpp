@@ -5,10 +5,7 @@
 
 #include "DatabaseQueue.h"
 #include "SQLOperation.h"
-#include "Threading/BoostAsioWork.h"
-
-#include <boost/asio/io_context.hpp>
-#include <boost/asio/post.hpp>
+#include "Threading/BoostAsioExecutor.h"
 
 #include <mutex>
 
@@ -22,12 +19,12 @@ namespace Skyfire
     struct DatabaseQueue::Impl
     {
         Impl()
-            : ioContext(), workGuard(Skyfire::Asio::MakeIoContextWorkGuard(ioContext)), closed(false)
+            : executor(), closed(false)
         {
+            executor.KeepAlive();
         }
 
-        boost::asio::io_context ioContext;
-        std::unique_ptr<Skyfire::Asio::IoContextWorkGuard> workGuard;
+        Skyfire::Asio::IoContextExecutor executor;
         std::mutex stateLock;
         bool closed;
     };
@@ -51,7 +48,7 @@ namespace Skyfire
         if (_impl->closed)
             return;
 
-        boost::asio::post(_impl->ioContext,
+        _impl->executor.Post(
             [operation]
             {
                 operation->SetConnection(CurrentDatabaseConnection);
@@ -66,7 +63,7 @@ namespace Skyfire
             return -1;
 
         CurrentDatabaseConnection = connection;
-        _impl->ioContext.run();
+        _impl->executor.Run();
         CurrentDatabaseConnection = nullptr;
         return 0;
     }
@@ -78,6 +75,6 @@ namespace Skyfire
             return;
 
         _impl->closed = true;
-        Skyfire::Asio::ResetWorkGuard(_impl->workGuard);
+        _impl->executor.ResetWork();
     }
 }
