@@ -82,6 +82,30 @@ namespace
         errorText = error.message();
         return false;
     }
+
+    class CountingSession : public RealmSocket::Session
+    {
+    public:
+        explicit CountingSession(uint32& closeCount) : _closeCount(closeCount)
+        {
+        }
+
+        void OnRead() override
+        {
+        }
+
+        void OnAccept() override
+        {
+        }
+
+        void OnClose() override
+        {
+            ++_closeCount;
+        }
+
+    private:
+        uint32& _closeCount;
+    };
 }
 
 int main()
@@ -139,5 +163,20 @@ int main()
     }
 
     socket->shutdown();
+
+    tcp::socket closePeer(ioContext);
+    std::shared_ptr<RealmSocket> closeSocket = CreateConnectedRealmSocket(ioContext, closePeer);
+    uint32 closeCount = 0;
+    closeSocket->set_session(std::unique_ptr<RealmSocket::Session>(new CountingSession(closeCount)));
+
+    closeSocket->shutdown();
+    closeSocket->shutdown();
+
+    if (closeCount != 1)
+    {
+        std::cerr << "RealmSocket notified close " << closeCount << " times\n";
+        return 1;
+    }
+
     return 0;
 }

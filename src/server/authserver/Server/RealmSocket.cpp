@@ -18,7 +18,7 @@ RealmSocket::Session::Session(void) { }
 RealmSocket::Session::~Session(void) { }
 
 RealmSocket::RealmSocket(std::unique_ptr<RealmSocketHandle> socket, std::string remoteAddress, uint16 remotePort) :
-    _socket(std::move(socket)), _readBuffer(), _inputBuffer(), _inputReadPos(0), _session(NULL),
+    _socket(std::move(socket)), _readBuffer(), _inputBuffer(), _inputReadPos(0), _session(),
     _remoteAddress(std::move(remoteAddress)), _remotePort(remotePort), _writeQueue(), _writeInProgress(false),
     _closed(false), _closeNotified(false)
 {
@@ -28,7 +28,6 @@ RealmSocket::RealmSocket(std::unique_ptr<RealmSocketHandle> socket, std::string 
 RealmSocket::~RealmSocket(void)
 {
     CloseSocket();
-    delete _session;
 }
 
 void RealmSocket::Start()
@@ -102,10 +101,9 @@ bool RealmSocket::send(const char* buf, size_t len)
     return true;
 }
 
-void RealmSocket::set_session(Session* session)
+void RealmSocket::set_session(std::unique_ptr<Session> session)
 {
-    delete _session;
-    _session = session;
+    _session = std::move(session);
 }
 
 void RealmSocket::Run()
@@ -209,6 +207,7 @@ void RealmSocket::CloseSocket()
     if (IsOpen())
     {
         boost::system::error_code ignored;
+        _socket->cancel(ignored);
         _socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored);
         _socket->close(ignored);
     }

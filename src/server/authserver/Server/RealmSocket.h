@@ -47,7 +47,7 @@ public:
     const std::string& getRemoteAddress(void) const;
     uint16 getRemotePort(void) const;
 
-    void set_session(Session* session);
+    void set_session(std::unique_ptr<Session> session);
 
 private:
     void Run();
@@ -66,7 +66,7 @@ private:
     std::array<char, 4096> _readBuffer;
     std::vector<char> _inputBuffer;
     size_t _inputReadPos;
-    Session* _session;
+    std::unique_ptr<Session> _session;
     std::string _remoteAddress;
     uint16 _remotePort;
     std::deque<std::vector<char>> _writeQueue;

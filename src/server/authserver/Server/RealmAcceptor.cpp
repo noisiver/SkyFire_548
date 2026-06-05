@@ -93,7 +93,7 @@ void RealmAcceptor::HandleAccept(std::shared_ptr<RealmSocketHandle> clientSocket
 
         std::unique_ptr<RealmSocketHandle> socketHandle(new RealmSocketHandle(std::move(*clientSocket)));
         std::shared_ptr<RealmSocket> socket(new RealmSocket(std::move(socketHandle), remoteAddress, remotePort));
-        socket->set_session(new AuthSocket(*socket));
+        socket->set_session(std::unique_ptr<RealmSocket::Session>(new AuthSocket(*socket)));
         socket->Start();
     }
 
