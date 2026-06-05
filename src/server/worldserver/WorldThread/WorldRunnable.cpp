@@ -13,13 +13,12 @@
 #include "MapManager.h"
 #include "ObjectAccessor.h"
 #include "OutdoorPvPMgr.h"
+#include "Platform/TimeUtils.h"
 #include "ScriptMgr.h"
 #include "Timer.h"
 #include "World.h"
 #include "WorldRunnable.h"
 #include "WorldSocketMgr.h"
-#include <chrono>
-#include <thread>
 
 #define WORLD_SLEEP_CONST 50
 
@@ -56,7 +55,7 @@ void WorldRunnable::Run()
         if (diff <= WORLD_SLEEP_CONST + prevSleepTime)
         {
             prevSleepTime = WORLD_SLEEP_CONST + prevSleepTime - diff;
-            std::this_thread::sleep_for(std::chrono::milliseconds(prevSleepTime));
+            Skyfire::SleepForMilliseconds(prevSleepTime);
         }
         else
             prevSleepTime = 0;
@@ -66,7 +65,7 @@ void WorldRunnable::Run()
             World::StopNow(SHUTDOWN_EXIT_CODE);
 
         while (m_ServiceStatus == 2)
-            Sleep(1000);
+            Skyfire::SleepForMilliseconds(1000);
 #endif
     }
 

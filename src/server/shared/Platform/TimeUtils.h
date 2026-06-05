@@ -34,9 +34,19 @@ namespace Skyfire
         return GetMSTimeDiff(oldMSTime, GetMSTime());
     }
 
-    inline void SleepFor(uint32 milliseconds)
+    inline void SleepForMilliseconds(uint32 milliseconds)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+    }
+
+    inline void SleepForSeconds(uint32 seconds)
+    {
+        std::this_thread::sleep_for(std::chrono::seconds(seconds));
+    }
+
+    inline void SleepFor(uint32 milliseconds)
+    {
+        SleepForMilliseconds(milliseconds);
     }
 
     inline bool LocalTime(time_t const& time, tm& result)

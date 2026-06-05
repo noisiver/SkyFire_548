@@ -21,6 +21,7 @@
 #include "CliRunnable.h"
 #include "Log.h"
 #include "Master.h"
+#include "Platform/TimeUtils.h"
 #include "RARunnable.h"
 #include "RealmList.h"
 #include "SFSoap.h"
@@ -28,7 +29,6 @@
 #include "Util.h"
 
 #include "BigNumber.h"
-#include <chrono>
 #include <csignal>
 #include <memory>
 #include <thread>
@@ -82,7 +82,7 @@ public:
         _lastChange = 0;
         while (!World::IsStopped())
         {
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            Skyfire::SleepForSeconds(1);
             uint32 curtime = getMSTime();
             // normal work
             uint32 worldLoopCounter = World::m_worldLoopCounter;

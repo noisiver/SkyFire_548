@@ -4,8 +4,8 @@
 */
 
 #include "Errors.h"
+#include "Platform/TimeUtils.h"
 #include "Threading.h"
-#include <chrono>
 #include <functional>
 
 using namespace Skyfire;
@@ -140,5 +140,5 @@ void Thread::setPriority(Priority type)
 
 void Thread::Sleep(unsigned long msecs)
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(msecs));
+    SleepForMilliseconds(uint32(msecs));
 }

@@ -12,11 +12,10 @@
 #include <mysql.h>
 #include <mysqld_error.h>
 #include <errmsg.h>
-#include <chrono>
-#include <thread>
 
 #include "MySQLConnection.h"
 #include "MySQLThreading.h"
+#include "Platform/TimeUtils.h"
 #include "QueryResult.h"
 #include "SQLOperation.h"
 #include "PreparedStatement.h"
@@ -497,7 +496,7 @@ bool MySQLConnection::_HandleMySQLErrno(uint32 errNo)
             }
 
             uint32 lErrno = mysql_errno(GetHandle());   // It's possible this attempted reconnect throws 2006 at us. To prevent crazy recursive calls, sleep here.
-            std::this_thread::sleep_for(std::chrono::seconds(3));
+            Skyfire::SleepForSeconds(3);
             return _HandleMySQLErrno(lErrno);           // Call self (recursive)
         }
 
@@ -512,12 +511,12 @@ bool MySQLConnection::_HandleMySQLErrno(uint32 errNo)
         case ER_BAD_FIELD_ERROR:
         case ER_NO_SUCH_TABLE:
             SF_LOG_ERROR("sql.sql", "Your database structure is not up to date. Please make sure you've executed all queries in the sql/updates folders.");
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            Skyfire::SleepForSeconds(10);
             std::abort();
             return false;
         case ER_PARSE_ERROR:
             SF_LOG_ERROR("sql.sql", "Error while parsing SQL. Core fix required.");
-            std::this_thread::sleep_for(std::chrono::seconds(10));
+            Skyfire::SleepForSeconds(10);
             std::abort();
             return false;
         default:

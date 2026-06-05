@@ -177,3 +177,15 @@ endif()
 target_link_libraries(delay_executor_tests Threads::Threads)
 
 add_test(NAME delay_executor_tests COMMAND delay_executor_tests)
+
+add_executable(time_utils_tests
+  TimeUtilsTests.cpp
+)
+
+target_include_directories(time_utils_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+)
+
+add_test(NAME time_utils_tests COMMAND time_utils_tests)
