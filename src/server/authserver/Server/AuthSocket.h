@@ -9,7 +9,6 @@
 #include "CryptoHash.h"
 #include "Common.h"
 #include "NetworkAddress.h"
-#include "Platform/Threading.h"
 #include "RealmSocket.h"
 #include "SRP6.h"
 
@@ -40,9 +39,6 @@ public:
     bool _HandleXferResume();
     bool _HandleXferCancel();
     bool _HandleXferAccept();
-
-    FILE* pPatch;
-    Skyfire::Mutex patcherLock;
 
 private:
     RealmSocket& socket_;

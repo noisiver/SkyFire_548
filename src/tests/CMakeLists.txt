@@ -75,6 +75,18 @@ target_link_libraries(realm_socket_tests
 
 add_test(NAME realm_socket_tests COMMAND realm_socket_tests)
 
+add_executable(auth_patch_transfer_tests
+  AuthPatchTransferTests.cpp
+)
+
+target_include_directories(auth_patch_transfer_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/authserver/Server
+)
+
+add_test(NAME auth_patch_transfer_tests COMMAND auth_patch_transfer_tests)
+
 add_executable(network_address_tests
   ${CMAKE_SOURCE_DIR}/src/server/shared/Utilities/NetworkAddress.cpp
   NetworkAddressTests.cpp

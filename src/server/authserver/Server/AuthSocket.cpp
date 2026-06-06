@@ -3,10 +3,10 @@
 * See LICENSE.md file for Copyright information
 */
 
-#include "MD5.h"
 #include <algorithm>
 
 #include "AuthCodes.h"
+#include "AuthPatchTransfer.h"
 #include "AuthSocket.h"
 #include "ByteBuffer.h"
 #include "Common.h"
@@ -19,9 +19,6 @@
 #include "openssl/crypto.h"
 #include "RealmList.h"
 #include "TOTP.h"
-#include <thread>
-
-#define ChunkSize 2048
 
 enum eAuthCmd
 {
@@ -30,8 +27,6 @@ enum eAuthCmd
     AUTH_RECONNECT_CHALLENGE = 0x02,
     AUTH_RECONNECT_PROOF = 0x03,
     REALM_LIST = 0x10,
-    XFER_INITIATE = 0x30,
-    XFER_DATA = 0x31,
     XFER_ACCEPT = 0x32,
     XFER_RESUME = 0x33,
     XFER_CANCEL = 0x34
@@ -106,22 +101,6 @@ typedef struct AUTH_RECONNECT_PROOF_C
     uint8   number_of_keys;
 } sAuthReconnectProof_C;
 
-typedef struct XFER_INIT
-{
-    uint8 cmd;                                              // XFER_INITIATE
-    uint8 fileNameLen;                                      // strlen(fileName);
-    uint8 fileName[5];                                      // fileName[fileNameLen]
-    uint64 file_size;                                       // file size (bytes)
-    uint8 md5[16];                                          // MD5
-} XFER_INIT;
-
-typedef struct XFER_DATA
-{
-    uint8 opcode;
-    uint16 data_size;
-    uint8 data[ChunkSize];
-} XFER_DATA_STRUCT;
-
 typedef struct AuthHandler
 {
     eAuthCmd cmd;
@@ -136,39 +115,6 @@ typedef struct AuthHandler
 #else
 #pragma pack(pop)
 #endif
-
-// Launch a thread to transfer a patch to the client
-class PatcherRunnable
-{
-public:
-    explicit PatcherRunnable(class AuthSocket*);
-    void run();
-
-private:
-    AuthSocket* mySocket;
-};
-
-typedef struct PATCH_INFO
-{
-    uint8 md5[16];
-} PATCH_INFO;
-
-// Caches MD5 hash of client patches present on the server
-class Patcher
-{
-public:
-    typedef std::map<std::string, PATCH_INFO*> Patches;
-    ~Patcher();
-    Patcher();
-    Patches::const_iterator begin() const { return _patches.begin(); }
-    Patches::const_iterator end() const { return _patches.end(); }
-    void LoadPatchMD5(char*);
-    bool GetHash(char* pat, uint8 mymd5[16]);
-
-private:
-    void LoadPatchesInfo();
-    Patches _patches;
-};
 
 const AuthHandler table[] =
 {
@@ -219,12 +165,9 @@ namespace
     }
 }
 
-// Holds the MD5 hash of client patches present on the server
-Patcher PatchesCache;
-
 // Constructor - set the N and g values for SRP6
 AuthSocket::AuthSocket(RealmSocket& socket) :
-    pPatch(NULL), socket_(socket), _authed(false), _build(0),
+    socket_(socket), _authed(false), _build(0),
     _expversion(0), _accountSecurityLevel(AccountTypes::SEC_PLAYER)
 {
 }
@@ -946,27 +889,31 @@ bool AuthSocket::_HandleRealmList()
 bool AuthSocket::_HandleXferResume()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleXferResume");
-    // Check packet length and patch existence
-    if (socket().GetAvailableBytes() < 9 || !pPatch) // FIXME: pPatch is never used
+
+    switch (Skyfire::Auth::EvaluatePatchTransferRequest(Skyfire::Auth::PatchTransferAction::Resume, socket().GetAvailableBytes()))
     {
-        SF_LOG_ERROR("server.authserver", "Error while resuming patch transfer (wrong packet)");
-        return false;
+        case Skyfire::Auth::PatchTransferDecision::NeedResumeOffset:
+            SF_LOG_ERROR("server.authserver", "Error while resuming patch transfer (wrong packet)");
+            return false;
+        case Skyfire::Auth::PatchTransferDecision::Unsupported:
+            SF_LOG_ERROR("server.authserver", "Client requested unsupported patch transfer resume");
+            socket().Close();
+            return false;
+        case Skyfire::Auth::PatchTransferDecision::Cancel:
+            break;
     }
 
-    // Launch a PatcherRunnable thread starting at given patch file offset
-    uint64 start = 0;
-    socket().DiscardBytes(1);
-    socket().ReadBytes(&start, sizeof(start));
-    fseek(pPatch, long(start), 0);
-
-    std::thread(&PatcherRunnable::run, PatcherRunnable(this)).detach();
-    return true;
+    return false;
 }
 
 // Cancel patch transfer
 bool AuthSocket::_HandleXferCancel()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleXferCancel");
+
+    if (Skyfire::Auth::EvaluatePatchTransferRequest(Skyfire::Auth::PatchTransferAction::Cancel, socket().GetAvailableBytes()) !=
+        Skyfire::Auth::PatchTransferDecision::Cancel)
+        return false;
 
     // Close and delete the socket
     socket().DiscardBytes(1);                                      // clear input buffer
@@ -980,138 +927,13 @@ bool AuthSocket::_HandleXferAccept()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleXferAccept");
 
-    // Check packet length and patch existence
-    if (!pPatch)
+    if (Skyfire::Auth::EvaluatePatchTransferRequest(Skyfire::Auth::PatchTransferAction::Accept, socket().GetAvailableBytes()) ==
+        Skyfire::Auth::PatchTransferDecision::Unsupported)
     {
-        SF_LOG_ERROR("server.authserver", "Error while accepting patch transfer (wrong packet)");
+        SF_LOG_ERROR("server.authserver", "Client requested unsupported patch transfer accept");
+        socket().Close();
         return false;
     }
 
-    // Launch a PatcherRunnable thread, starting at the beginning of the patch file
-    socket().DiscardBytes(1);                                      // clear input buffer
-    fseek(pPatch, 0, 0);
-
-    std::thread(&PatcherRunnable::run, PatcherRunnable(this)).detach();
-    return true;
-}
-
-PatcherRunnable::PatcherRunnable(class AuthSocket* as)
-{
-    mySocket = as;
-}
-
-// Send content of patch file to the client
-void PatcherRunnable::run() { }
-
-// Preload MD5 hashes of existing patch files on server
-#ifndef _WIN32
-#include <dirent.h>
-#include <errno.h>
-void Patcher::LoadPatchesInfo()
-{
-    DIR* dirp;
-    struct dirent* dp;
-    dirp = opendir("./patches/");
-
-    if (!dirp)
-        return;
-
-    while (dirp)
-    {
-        errno = 0;
-        if ((dp = readdir(dirp)) != NULL)
-        {
-            int l = strlen(dp->d_name);
-
-            if (l < 8)
-                continue;
-
-            if (!memcmp(&dp->d_name[l - 4], ".mpq", 4))
-                LoadPatchMD5(dp->d_name);
-        }
-        else
-        {
-            if (errno != 0)
-            {
-                closedir(dirp);
-                return;
-            }
-            break;
-        }
-    }
-
-    if (dirp)
-        closedir(dirp);
-}
-#else
-void Patcher::LoadPatchesInfo()
-{
-    WIN32_FIND_DATA fil;
-    HANDLE hFil = FindFirstFile("./patches/*.mpq", &fil);
-    if (hFil == INVALID_HANDLE_VALUE)
-        return;                                             // no patches were found
-
-    do
-        LoadPatchMD5(fil.cFileName);
-    while (FindNextFile(hFil, &fil));
-}
-#endif
-
-// Calculate and store MD5 hash for a given patch file
-void Patcher::LoadPatchMD5(char* szFileName)
-{
-    // Try to open the patch file
-    std::string path = "./patches/";
-    path += szFileName;
-    FILE* pPatch = fopen(path.c_str(), "rb");
-    SF_LOG_DEBUG("network", "Loading patch info from %s\n", path.c_str());
-
-    if (!pPatch)
-    {
-        SF_LOG_ERROR("server.authserver", "Error loading patch %s\n", path.c_str());
-        return;
-    }
-
-    // Calculate the MD5 hash
-    MD5Hash md5;
-    uint8* buf = new uint8[512 * 1024];
-
-    while (!feof(pPatch))
-    {
-        size_t read = fread(buf, 1, 512 * 1024, pPatch);
-        md5.UpdateData(buf, read);
-    }
-
-    delete[] buf;
-    fclose(pPatch);
-
-    // Store the result in the internal patch hash map
-    _patches[path] = new PATCH_INFO;
-    md5.Finalize((uint8*)&_patches[path]->md5, 16);
-}
-
-// Get cached MD5 hash for a given patch file
-bool Patcher::GetHash(char* pat, uint8 mymd5[16])
-{
-    for (Patches::iterator i = _patches.begin(); i != _patches.end(); ++i)
-        if (!stricmp(pat, i->first.c_str()))
-        {
-            memcpy(mymd5, i->second->md5, 16);
-            return true;
-        }
-
     return false;
-}
-
-// Launch the patch hashing mechanism on object creation
-Patcher::Patcher()
-{
-    LoadPatchesInfo();
-}
-
-// Empty and delete the patch map on termination
-Patcher::~Patcher()
-{
-    for (Patches::iterator i = _patches.begin(); i != _patches.end(); ++i)
-        delete i->second;
 }
