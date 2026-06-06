@@ -8,6 +8,7 @@
 #include "MySQLConnection.h"
 #include "MySQLThreading.h"
 #include "SQLOperation.h"
+#include "Threading/BoostAsioThread.h"
 
 #include <stdexcept>
 
@@ -18,7 +19,9 @@ DatabaseWorker::DatabaseWorker(Skyfire::DatabaseQueue* new_queue, MySQLConnectio
     if (!m_queue || !m_conn)
         return;
 
-    if (m_thread.Start(m_queue->GetExecutor(),
+    m_thread.reset(new Skyfire::Asio::IoContextThread);
+
+    if (m_thread->Start(m_queue->GetExecutor(),
         [this]
         {
             m_queue->BindConnection(m_conn);
@@ -45,5 +48,8 @@ int DatabaseWorker::svc()
 
 int DatabaseWorker::wait()
 {
-    return m_thread.Join();
+    if (!m_thread)
+        return 0;
+
+    return m_thread->Join();
 }
