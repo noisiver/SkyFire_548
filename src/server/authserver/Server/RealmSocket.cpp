@@ -39,7 +39,7 @@ void RealmSocket::Start()
     AsyncRead();
 }
 
-void RealmSocket::shutdown()
+void RealmSocket::Close()
 {
     CloseSocket();
 }
@@ -54,36 +54,43 @@ uint16 RealmSocket::getRemotePort(void) const
     return _remotePort;
 }
 
-size_t RealmSocket::recv_len(void) const
+size_t RealmSocket::GetAvailableBytes(void) const
 {
     return _inputBuffer.size() - _inputReadPos;
 }
 
-bool RealmSocket::recv_soft(char* buf, size_t len)
+bool RealmSocket::PeekBytes(void* buf, size_t len, size_t offset) const
 {
-    if (recv_len() < len)
+    if (len == 0)
+        return true;
+
+    if (buf == NULL)
         return false;
 
-    memcpy(buf, _inputBuffer.data() + _inputReadPos, len);
+    size_t availableBytes = GetAvailableBytes();
+    if (offset > availableBytes || len > availableBytes - offset)
+        return false;
+
+    memcpy(buf, _inputBuffer.data() + _inputReadPos + offset, len);
     return true;
 }
 
-bool RealmSocket::recv(char* buf, size_t len)
+bool RealmSocket::ReadBytes(void* buf, size_t len)
 {
-    bool ret = recv_soft(buf, len);
+    bool ret = PeekBytes(buf, len);
 
     if (ret)
-        recv_skip(len);
+        DiscardBytes(len);
 
     return ret;
 }
 
-void RealmSocket::recv_skip(size_t len)
+void RealmSocket::DiscardBytes(size_t len)
 {
     _inputReadPos = std::min(_inputReadPos + len, _inputBuffer.size());
 }
 
-bool RealmSocket::send(const char* buf, size_t len)
+bool RealmSocket::QueueSend(void const* buf, size_t len)
 {
     if (buf == NULL || len == 0)
         return true;
@@ -91,7 +98,8 @@ bool RealmSocket::send(const char* buf, size_t len)
     if (_closed)
         return false;
 
-    std::vector<char> data(buf, buf + len);
+    char const* bytes = static_cast<char const*>(buf);
+    std::vector<char> data(bytes, bytes + len);
     std::shared_ptr<RealmSocket> self = shared_from_this();
     boost::asio::post(_socket->get_executor(),
         [self, data = std::move(data)]() mutable

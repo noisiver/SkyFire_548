@@ -35,14 +35,14 @@ public:
     ~RealmSocket(void);
 
     void Start();
-    void shutdown();
+    void Close();
 
-    size_t recv_len(void) const;
-    bool recv_soft(char* buf, size_t len);
-    bool recv(char* buf, size_t len);
-    void recv_skip(size_t len);
+    size_t GetAvailableBytes(void) const;
+    bool PeekBytes(void* buf, size_t len, size_t offset = 0) const;
+    bool ReadBytes(void* buf, size_t len);
+    void DiscardBytes(size_t len);
 
-    bool send(const char* buf, size_t len);
+    bool QueueSend(void const* buf, size_t len);
 
     const std::string& getRemoteAddress(void) const;
     uint16 getRemotePort(void) const;

@@ -184,6 +184,41 @@ const AuthHandler table[] =
 
 #define AUTH_TOTAL_COMMANDS 8
 
+namespace
+{
+    bool ReadAuthChallengeFrame(RealmSocket& socket, std::vector<uint8>& packet, uint16& remaining)
+    {
+        const size_t headerSize = 4;
+        if (socket.GetAvailableBytes() < headerSize)
+            return false;
+
+        std::vector<uint8> header(headerSize);
+        if (!socket.PeekBytes(&header[0], header.size()))
+            return false;
+
+        EndianConvertPtr<uint16>(&header[0]);
+        remaining = ((sAuthLogonChallenge_C*)&header[0])->size;
+
+        if (remaining < sizeof(sAuthLogonChallenge_C) - headerSize)
+        {
+            socket.DiscardBytes(headerSize);
+            return false;
+        }
+
+        if (socket.GetAvailableBytes() < headerSize + remaining)
+            return false;
+
+        packet.resize(headerSize + remaining + 1);
+        packet[packet.size() - 1] = 0;
+
+        if (!socket.ReadBytes(&packet[0], packet.size() - 1))
+            return false;
+
+        EndianConvertPtr<uint16>(&packet[0]);
+        return true;
+    }
+}
+
 // Holds the MD5 hash of client patches present on the server
 Patcher PatchesCache;
 
@@ -217,7 +252,7 @@ void AuthSocket::OnRead()
     uint8 _cmd = 0;
     while (1)
     {
-        if (!socket().recv_soft((char*)&_cmd, 1))
+        if (!socket().PeekBytes(&_cmd, 1))
             return;
 
         if (_cmd == AUTH_LOGON_CHALLENGE)
@@ -227,7 +262,7 @@ void AuthSocket::OnRead()
             {
                 SF_LOG_WARN("server.authserver", "Got %u AUTH_LOGON_CHALLENGE in a row from '%s', possible ongoing DoS",
                     challengesInARow, socket().getRemoteAddress().c_str());
-                socket().shutdown();
+                socket().Close();
                 return;
             }
         }
@@ -241,12 +276,12 @@ void AuthSocket::OnRead()
                 (table[i].status == STATUS_CONNECTED || (_authed && table[i].status == STATUS_AUTHED)))
             {
                 SF_LOG_DEBUG("server.authserver", "Got data for cmd %u recv length %u",
-                    (uint32)_cmd, (uint32)socket().recv_len());
+                    (uint32)_cmd, (uint32)socket().GetAvailableBytes());
 
                 if (!(*this.*table[i].handler)())
                 {
                     SF_LOG_DEBUG("server.authserver", "Command handler failed for cmd %u recv length %u",
-                        (uint32)_cmd, (uint32)socket().recv_len());
+                        (uint32)_cmd, (uint32)socket().GetAvailableBytes());
                     return;
                 }
                 break;
@@ -257,7 +292,7 @@ void AuthSocket::OnRead()
         if (i == AUTH_TOTAL_COMMANDS)
         {
             SF_LOG_ERROR("server.authserver", "Got unknown packet from '%s'", socket().getRemoteAddress().c_str());
-            socket().shutdown();
+            socket().Close();
             return;
         }
     }
@@ -267,30 +302,14 @@ void AuthSocket::OnRead()
 bool AuthSocket::_HandleLogonChallenge()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleLogonChallenge");
-    if (socket().recv_len() < sizeof(sAuthLogonChallenge_C))
-        return false;
-
-    // Read the first 4 bytes (header) to get the length of the remaining of the packet
     std::vector<uint8> buf;
-    buf.resize(4);
-
-    socket().recv((char*)&buf[0], 4);
-
-    EndianConvertPtr<uint16>(&buf[0]);
-
-    uint16 remaining = ((sAuthLogonChallenge_C*)&buf[0])->size;
-    SF_LOG_DEBUG("server.authserver", "[AuthChallenge] got header, body is %#04x bytes", remaining);
-
-    if ((remaining < sizeof(sAuthLogonChallenge_C) - buf.size()) || (socket().recv_len() < remaining))
+    uint16 remaining = 0;
+    if (!ReadAuthChallengeFrame(socket(), buf, remaining))
         return false;
 
-    //No big fear of memory outage (size is int16, i.e. < 65536)
-    buf.resize(remaining + buf.size() + 1);
-    buf[buf.size() - 1] = 0;
+    SF_LOG_DEBUG("server.authserver", "[AuthChallenge] got header, body is %#04x bytes", remaining);
     sAuthLogonChallenge_C* ch = (sAuthLogonChallenge_C*)&buf[0];
 
-    // Read the remaining of the packet
-    socket().recv((char*)&buf[4], remaining);
     SF_LOG_DEBUG("server.authserver", "[AuthChallenge] got full packet, %#04x bytes", ch->size);
     SF_LOG_DEBUG("server.authserver", "[AuthChallenge] name(%d): '%s'", ch->I_len, ch->I);
 
@@ -494,7 +513,7 @@ bool AuthSocket::_HandleLogonChallenge()
             pkt << uint8(AuthResult::WOW_FAIL_UNKNOWN_ACCOUNT);
     }
 
-    socket().send((char const*)pkt.contents(), pkt.size());
+    socket().QueueSend(pkt.contents(), pkt.size());
     return true;
 }
 
@@ -502,10 +521,26 @@ bool AuthSocket::_HandleLogonChallenge()
 bool AuthSocket::_HandleLogonProof()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleLogonProof");
-    // Read the packet
     sAuthLogonProof_C lp;
 
-    if (!socket().recv((char*)&lp, sizeof(sAuthLogonProof_C)))
+    if (!socket().PeekBytes(&lp, sizeof(sAuthLogonProof_C)))
+        return false;
+
+    bool needsToken = (lp.securityFlags & 0x04) || !_tokenKey.empty();
+    uint8 tokenSize = 0;
+    size_t requiredBytes = sizeof(sAuthLogonProof_C);
+
+    if (needsToken)
+    {
+        if (!socket().PeekBytes(&tokenSize, sizeof(tokenSize), requiredBytes))
+            return false;
+
+        requiredBytes += sizeof(tokenSize) + tokenSize;
+        if (socket().GetAvailableBytes() < requiredBytes)
+            return false;
+    }
+
+    if (!socket().ReadBytes(&lp, sizeof(sAuthLogonProof_C)))
         return false;
 
     // If the client has no valid version
@@ -513,7 +548,7 @@ bool AuthSocket::_HandleLogonProof()
     {
         // Check if we have the appropriate patch on the disk
         SF_LOG_DEBUG("network", "Client with invalid version, patching is not implemented");
-        socket().shutdown();
+        socket().Close();
         return true;
     }
 
@@ -540,20 +575,23 @@ bool AuthSocket::_HandleLogonProof()
         SkyFire::Crypto::SHA1::Digest M2 = SkyFire::Crypto::SRP6::GetSessionVerifier(lp.A, lp.clientM, _sessionKey);
 
         // Check auth token
-        if ((lp.securityFlags & 0x04) || !_tokenKey.empty())
+        if (needsToken)
         {
-            uint8 size;
-            socket().recv((char*)&size, 1);
-            char* token = new char[size + 1];
+            uint8 size = 0;
+            if (!socket().ReadBytes(&size, sizeof(size)))
+                return false;
+
+            std::vector<char> token(size + 1);
             token[size] = '\0';
-            socket().recv(token, size);
+            if (!socket().ReadBytes(&token[0], size))
+                return false;
+
             unsigned int validToken = TOTP::GenerateToken(_tokenKey);
-            unsigned int incomingToken = atoi(token);
-            delete[] token;
+            unsigned int incomingToken = atoi(&token[0]);
             if (validToken != incomingToken)
             {
                 char data[] = { AUTH_LOGON_PROOF, uint8(AuthResult::WOW_FAIL_UNKNOWN_ACCOUNT), 3, 0 };
-                socket().send(data, sizeof(data));
+                socket().QueueSend(data, sizeof(data));
                 return false;
             }
         }
@@ -567,7 +605,7 @@ bool AuthSocket::_HandleLogonProof()
             proof.unk1 = 0x00800000;    // Accountflags. 0x01 = GM, 0x08 = Trial, 0x00800000 = Pro pass.
             proof.unk2 = 0x00;          // SurveyId
             proof.unk3 = 0x00;
-            socket().send((char*)&proof, sizeof(proof));
+            socket().QueueSend(&proof, sizeof(proof));
         }
         else
         {
@@ -576,7 +614,7 @@ bool AuthSocket::_HandleLogonProof()
             proof.cmd = AUTH_LOGON_PROOF;
             proof.error = 0;
             proof.unk2 = 0x00;
-            socket().send((char*)&proof, sizeof(proof));
+            socket().QueueSend(&proof, sizeof(proof));
         }
 
         _authed = true;
@@ -584,7 +622,7 @@ bool AuthSocket::_HandleLogonProof()
     else
     {
         char data[4] = { AUTH_LOGON_PROOF, uint8(AuthResult::WOW_FAIL_UNKNOWN_ACCOUNT), 3, 0 };
-        socket().send(data, sizeof(data));
+        socket().QueueSend(data, sizeof(data));
 
         SF_LOG_DEBUG("server.authserver",
             "'%s:%d' [AuthChallenge] account %s tried to login with invalid password!",
@@ -649,30 +687,14 @@ bool AuthSocket::_HandleLogonProof()
 bool AuthSocket::_HandleReconnectChallenge()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleReconnectChallenge");
-    if (socket().recv_len() < sizeof(sAuthLogonChallenge_C))
-        return false;
-
-    // Read the first 4 bytes (header) to get the length of the remaining of the packet
     std::vector<uint8> buf;
-    buf.resize(4);
-
-    socket().recv((char*)&buf[0], 4);
-
-    EndianConvertPtr<uint16>(&buf[0]);
-
-    uint16 remaining = ((sAuthLogonChallenge_C*)&buf[0])->size;
-    SF_LOG_DEBUG("server.authserver", "[ReconnectChallenge] got header, body is %#04x bytes", remaining);
-
-    if ((remaining < sizeof(sAuthLogonChallenge_C) - buf.size()) || (socket().recv_len() < remaining))
+    uint16 remaining = 0;
+    if (!ReadAuthChallengeFrame(socket(), buf, remaining))
         return false;
 
-    // No big fear of memory outage (size is int16, i.e. < 65536)
-    buf.resize(remaining + buf.size() + 1);
-    buf[buf.size() - 1] = 0;
+    SF_LOG_DEBUG("server.authserver", "[ReconnectChallenge] got header, body is %#04x bytes", remaining);
     sAuthLogonChallenge_C* ch = (sAuthLogonChallenge_C*)&buf[0];
 
-    // Read the remaining of the packet
-    socket().recv((char*)&buf[4], remaining);
     SF_LOG_DEBUG("server.authserver", "[ReconnectChallenge] got full packet, %#04x bytes", ch->size);
     SF_LOG_DEBUG("server.authserver", "[ReconnectChallenge] name(%d): '%s'", ch->I_len, ch->I);
 
@@ -688,7 +710,7 @@ bool AuthSocket::_HandleReconnectChallenge()
         SF_LOG_ERROR("server.authserver",
             "'%s:%d' [ERROR] user %s tried to login and we cannot find his session key in the database.",
             socket().getRemoteAddress().c_str(), socket().getRemotePort(), _login.c_str());
-        socket().shutdown();
+        socket().Close();
         return false;
     }
 
@@ -718,7 +740,7 @@ bool AuthSocket::_HandleReconnectChallenge()
     pkt << uint8(0x00);
     pkt.append(_reconnectProof);                            // 16 bytes random
     pkt << uint64(0x00) << uint64(0x00);                    // 16 bytes zeros
-    socket().send((char const*)pkt.contents(), pkt.size());
+    socket().QueueSend(pkt.contents(), pkt.size());
     return true;
 }
 
@@ -728,7 +750,7 @@ bool AuthSocket::_HandleReconnectProof()
     SF_LOG_DEBUG("server.authserver", "Entering _HandleReconnectProof");
     // Read the packet
     sAuthReconnectProof_C lp;
-    if (!socket().recv((char*)&lp, sizeof(sAuthReconnectProof_C)))
+    if (!socket().ReadBytes(&lp, sizeof(sAuthReconnectProof_C)))
         return false;
 
     if (_login.empty())
@@ -751,7 +773,7 @@ bool AuthSocket::_HandleReconnectProof()
         pkt << uint8(AUTH_RECONNECT_PROOF);
         pkt << uint8(0x00);
         pkt << uint16(0x00);                               // 2 bytes zeros
-        socket().send((char const*)pkt.contents(), pkt.size());
+        socket().QueueSend(pkt.contents(), pkt.size());
         _authed = true;
         return true;
     }
@@ -759,7 +781,7 @@ bool AuthSocket::_HandleReconnectProof()
     {
         SF_LOG_ERROR("server.authserver", "'%s:%d' [ERROR] user %s tried to login, but session is invalid.",
             socket().getRemoteAddress().c_str(), socket().getRemotePort(), _login.c_str());
-        socket().shutdown();
+        socket().Close();
         return false;
     }
 }
@@ -790,10 +812,10 @@ Skyfire::Net::Address const& AuthSocket::GetAddressForClient(Realm const& realm,
 bool AuthSocket::_HandleRealmList()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleRealmList");
-    if (socket().recv_len() < 5)
+    if (socket().GetAvailableBytes() < 5)
         return false;
 
-    socket().recv_skip(5);
+    socket().DiscardBytes(5);
 
     // Get the user id (else close the connection)
     // No SQL injection (prepared statement)
@@ -805,7 +827,7 @@ bool AuthSocket::_HandleRealmList()
         SF_LOG_ERROR("server.authserver",
             "'%s:%d' [ERROR] user %s tried to login but we cannot find him in the database.",
             socket().getRemoteAddress().c_str(), socket().getRemotePort(), _login.c_str());
-        socket().shutdown();
+        socket().Close();
         return false;
     }
 
@@ -915,7 +937,7 @@ bool AuthSocket::_HandleRealmList()
     hdr.append(RealmListSizeBuffer);                        // append RealmList's size buffer
     hdr.append(pkt);                                        // append realms in the realmlist
 
-    socket().send((char const*)hdr.contents(), hdr.size());
+    socket().QueueSend(hdr.contents(), hdr.size());
 
     return true;
 }
@@ -925,7 +947,7 @@ bool AuthSocket::_HandleXferResume()
 {
     SF_LOG_DEBUG("server.authserver", "Entering _HandleXferResume");
     // Check packet length and patch existence
-    if (socket().recv_len() < 9 || !pPatch) // FIXME: pPatch is never used
+    if (socket().GetAvailableBytes() < 9 || !pPatch) // FIXME: pPatch is never used
     {
         SF_LOG_ERROR("server.authserver", "Error while resuming patch transfer (wrong packet)");
         return false;
@@ -933,8 +955,8 @@ bool AuthSocket::_HandleXferResume()
 
     // Launch a PatcherRunnable thread starting at given patch file offset
     uint64 start = 0;
-    socket().recv_skip(1);
-    socket().recv((char*)&start, sizeof(start));
+    socket().DiscardBytes(1);
+    socket().ReadBytes(&start, sizeof(start));
     fseek(pPatch, long(start), 0);
 
     std::thread(&PatcherRunnable::run, PatcherRunnable(this)).detach();
@@ -947,8 +969,8 @@ bool AuthSocket::_HandleXferCancel()
     SF_LOG_DEBUG("server.authserver", "Entering _HandleXferCancel");
 
     // Close and delete the socket
-    socket().recv_skip(1);                                         //clear input buffer
-    socket().shutdown();
+    socket().DiscardBytes(1);                                      // clear input buffer
+    socket().Close();
 
     return true;
 }
@@ -966,7 +988,7 @@ bool AuthSocket::_HandleXferAccept()
     }
 
     // Launch a PatcherRunnable thread, starting at the beginning of the patch file
-    socket().recv_skip(1);                                         // clear input buffer
+    socket().DiscardBytes(1);                                      // clear input buffer
     fseek(pPatch, 0, 0);
 
     std::thread(&PatcherRunnable::run, PatcherRunnable(this)).detach();

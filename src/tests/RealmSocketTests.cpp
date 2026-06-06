@@ -8,6 +8,7 @@
 #include <boost/asio/buffer.hpp>
 #include <boost/asio/error.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/write.hpp>
 #include <boost/system/error_code.hpp>
 
 #include <array>
@@ -106,6 +107,66 @@ namespace
     private:
         uint32& _closeCount;
     };
+
+    class BufferSession : public RealmSocket::Session
+    {
+    public:
+        explicit BufferSession(bool& passed) : _passed(passed)
+        {
+        }
+
+        void OnRead() override
+        {
+            if (_socket == nullptr)
+                return;
+
+            if (_socket->GetAvailableBytes() != 5)
+                return;
+
+            char peeked[3] = {};
+            if (!_socket->PeekBytes(peeked, sizeof(peeked)) || std::string(peeked, sizeof(peeked)) != "abc")
+                return;
+
+            if (_socket->GetAvailableBytes() != 5)
+                return;
+
+            char offsetPeek[2] = {};
+            if (!_socket->PeekBytes(offsetPeek, sizeof(offsetPeek), 3) || std::string(offsetPeek, sizeof(offsetPeek)) != "de")
+                return;
+
+            char firstRead[2] = {};
+            if (!_socket->ReadBytes(firstRead, sizeof(firstRead)) || std::string(firstRead, sizeof(firstRead)) != "ab")
+                return;
+
+            if (_socket->GetAvailableBytes() != 3)
+                return;
+
+            _socket->DiscardBytes(1);
+
+            char secondRead[2] = {};
+            if (!_socket->ReadBytes(secondRead, sizeof(secondRead)) || std::string(secondRead, sizeof(secondRead)) != "de")
+                return;
+
+            _passed = _socket->GetAvailableBytes() == 0;
+        }
+
+        void OnAccept() override
+        {
+        }
+
+        void OnClose() override
+        {
+        }
+
+        void SetSocket(RealmSocket& socket)
+        {
+            _socket = &socket;
+        }
+
+    private:
+        bool& _passed;
+        RealmSocket* _socket = nullptr;
+    };
 }
 
 int main()
@@ -119,9 +180,9 @@ int main()
     std::shared_ptr<RealmSocket> socket = CreateConnectedRealmSocket(ioContext, peer);
 
     char const payload[] = "queued-auth-write";
-    if (!socket->send(payload, std::strlen(payload)))
+    if (!socket->QueueSend(payload, std::strlen(payload)))
     {
-        std::cerr << "RealmSocket::send rejected an open socket\n";
+        std::cerr << "RealmSocket::QueueSend rejected an open socket\n";
         return 1;
     }
 
@@ -129,7 +190,7 @@ int main()
     std::string errorText;
     if (TryRead(peer, received, errorText))
     {
-        std::cerr << "RealmSocket::send wrote before the io_context was polled\n";
+        std::cerr << "RealmSocket::QueueSend wrote before the io_context was polled\n";
         return 1;
     }
 
@@ -162,19 +223,44 @@ int main()
         return 1;
     }
 
-    socket->shutdown();
+    socket->Close();
 
     tcp::socket closePeer(ioContext);
     std::shared_ptr<RealmSocket> closeSocket = CreateConnectedRealmSocket(ioContext, closePeer);
     uint32 closeCount = 0;
     closeSocket->set_session(std::unique_ptr<RealmSocket::Session>(new CountingSession(closeCount)));
 
-    closeSocket->shutdown();
-    closeSocket->shutdown();
+    closeSocket->Close();
+    closeSocket->Close();
 
     if (closeCount != 1)
     {
         std::cerr << "RealmSocket notified close " << closeCount << " times\n";
+        return 1;
+    }
+
+    tcp::socket bufferPeer(ioContext);
+    std::shared_ptr<RealmSocket> bufferSocket = CreateConnectedRealmSocket(ioContext, bufferPeer);
+    bool bufferApiPassed = false;
+    std::unique_ptr<BufferSession> bufferSession(new BufferSession(bufferApiPassed));
+    bufferSession->SetSocket(*bufferSocket);
+    bufferSocket->set_session(std::move(bufferSession));
+    bufferSocket->Start();
+
+    boost::asio::write(bufferPeer, boost::asio::buffer("abcde", 5));
+
+    for (uint32 i = 0; i < 200 && !bufferApiPassed; ++i)
+    {
+        ioContext.restart();
+        ioContext.poll();
+
+        if (!bufferApiPassed)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    if (!bufferApiPassed)
+    {
+        std::cerr << "RealmSocket explicit buffer API did not preserve peek/read/discard semantics\n";
         return 1;
     }
 
