@@ -4,9 +4,9 @@
 */
 
 #include "Network/BoostAsioUtils.h"
+#include "Threading/BoostAsioWork.h"
 
 #include <boost/asio/error.hpp>
-#include <boost/asio/executor_work_guard.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/steady_timer.hpp>
@@ -90,8 +90,7 @@ int main()
     }
 
     boost::asio::io_context guardedContext;
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type> guard =
-        boost::asio::make_work_guard(guardedContext);
+    std::unique_ptr<Skyfire::Asio::IoContextWorkGuard> guard = Skyfire::Asio::MakeIoContextWorkGuard(guardedContext);
 
     Skyfire::Net::StopIoContext(guardedContext);
 
@@ -107,7 +106,7 @@ int main()
         return 1;
     }
 
-    guard.reset();
+    Skyfire::Asio::ResetWorkGuard(guard);
     Skyfire::Net::RestartIoContext(guardedContext);
 
     bool postedAfterExplicitStop = false;
