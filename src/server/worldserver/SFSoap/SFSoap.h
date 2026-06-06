@@ -7,13 +7,12 @@
 #define _SFSoap_H
 
 #include "Define.h"
+#include "Threading/BoostAsioTaskRunner.h"
 
 #include <condition_variable>
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <utility>
 
 class SFSoapRunnable
@@ -58,28 +57,24 @@ public:
         if (!runner)
             return false;
 
-        if (_thread && _thread->joinable())
+        if (_runner.IsRunning())
             return false;
 
-        _thread.reset(new std::thread(std::move(runner)));
-        return true;
+        return _runner.Start(std::move(runner)) == 0;
     }
 
     void Join()
     {
-        if (_thread && _thread->joinable())
-            _thread->join();
-
-        _thread.reset();
+        _runner.Join();
     }
 
     bool IsRunning() const
     {
-        return _thread && _thread->joinable();
+        return _runner.IsRunning();
     }
 
 private:
-    std::unique_ptr<std::thread> _thread;
+    Skyfire::Asio::IoContextTaskRunner _runner;
 
     SFSoapService(SFSoapService const&) = delete;
     SFSoapService& operator=(SFSoapService const&) = delete;

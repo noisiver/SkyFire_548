@@ -232,6 +232,28 @@ target_link_libraries(boost_asio_thread_tests Threads::Threads)
 
 add_test(NAME boost_asio_thread_tests COMMAND boost_asio_thread_tests)
 
+add_executable(boost_asio_task_runner_tests
+  BoostAsioTaskRunnerTests.cpp
+)
+
+target_include_directories(boost_asio_task_runner_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Threading
+  ${Boost_INCLUDE_DIRS}
+)
+
+if(TARGET Boost::headers)
+  target_link_libraries(boost_asio_task_runner_tests Boost::headers)
+elseif(TARGET Boost::boost)
+  target_link_libraries(boost_asio_task_runner_tests Boost::boost)
+endif()
+
+target_link_libraries(boost_asio_task_runner_tests Threads::Threads)
+
+add_test(NAME boost_asio_task_runner_tests COMMAND boost_asio_task_runner_tests)
+
 add_executable(delay_executor_tests
   ${CMAKE_SOURCE_DIR}/src/server/shared/Threading/DelayExecutor.cpp
   DelayExecutorTests.cpp
@@ -275,8 +297,16 @@ target_include_directories(sfsoap_service_tests PRIVATE
   ${CMAKE_BINARY_DIR}
   ${CMAKE_SOURCE_DIR}/src/server/shared
   ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Threading
   ${CMAKE_SOURCE_DIR}/src/server/worldserver/SFSoap
+  ${Boost_INCLUDE_DIRS}
 )
+
+if(TARGET Boost::headers)
+  target_link_libraries(sfsoap_service_tests Boost::headers)
+elseif(TARGET Boost::boost)
+  target_link_libraries(sfsoap_service_tests Boost::boost)
+endif()
 
 target_link_libraries(sfsoap_service_tests Threads::Threads)
 
