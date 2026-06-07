@@ -324,3 +324,16 @@ endif()
 target_link_libraries(sfsoap_service_tests Threads::Threads)
 
 add_test(NAME sfsoap_service_tests COMMAND sfsoap_service_tests)
+
+add_executable(world_socket_session_state_tests
+  WorldSocketSessionStateTests.cpp
+)
+
+target_include_directories(world_socket_session_state_tests PRIVATE
+  ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/src/server/shared
+  ${CMAKE_SOURCE_DIR}/src/server/shared/Platform
+  ${CMAKE_SOURCE_DIR}/src/server/game/Server
+)
+
+add_test(NAME world_socket_session_state_tests COMMAND world_socket_session_state_tests)
