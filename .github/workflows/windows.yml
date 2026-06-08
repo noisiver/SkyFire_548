@@ -2,7 +2,7 @@ name: windows-build
 
 on:
   push:
-    branches: [ main, trunk, movement, boost_conversion ]
+    branches: [ main, trunk, movement, boost_conversion, game_refine ]
     paths-ignore:
       - 'sql/**'
       
@@ -29,6 +29,10 @@ jobs:
     - uses: actions/checkout@v4
 
     - uses: FranzDiebold/github-env-vars-action@v2
+
+    - name: Check game source tabs
+      shell: pwsh
+      run: ./tools/dev/game_metrics.ps1 -CheckNoTabs
 
     - name: Create Build Environment
       shell: pwsh
@@ -87,19 +91,27 @@ jobs:
           Pop-Location
         }
 
-    - name: windows configure
+    - name: windows configure with PCH
       shell: pwsh
       run: |
         cmake -S "$env:GITHUB_WORKSPACE" -B "$env:BUILD_DIR" `
           -A x64 `
           -DTOOLS=ON `
+          -DUSE_COREPCH=ON `
+          -DUSE_SCRIPTPCH=ON `
+          -DSKYFIRE_BUILD_TESTS=ON `
           -DBOOST_ROOT="$env:BOOST_ROOT" `
           -DOPENSSL_ROOT_DIR="$env:OPENSSL_ROOT_DIR"
 
-    - name: windows build
+    - name: windows build with PCH
       shell: pwsh
       run: |
         cmake --build "$env:BUILD_DIR" --config "$env:BUILD_TYPE" --parallel 4
+
+    - name: windows tests
+      shell: pwsh
+      run: |
+        ctest --test-dir "$env:BUILD_DIR" -C "$env:BUILD_TYPE" --output-on-failure
 
     - name: Create Upload File Name
       shell: pwsh
