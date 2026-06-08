@@ -33,6 +33,7 @@
 #include "SpellInfo.h"
 #include "SpellMgr.h"
 #include "SpellScript.h"
+#include "SpellValidation.h"
 #include "TemporarySummon.h"
 #include "Totem.h"
 #include "Unit.h"
@@ -6420,7 +6421,8 @@ SpellCastResult Spell::CheckCasterAuras() const
             Unit::AuraEffectList const& stunAuras = m_caster->GetAuraEffectsByType(SPELL_AURA_MOD_STUN);
             for (Unit::AuraEffectList::const_iterator i = stunAuras.begin(); i != stunAuras.end(); ++i)
             {
-                if ((*i)->GetSpellInfo()->GetAllEffectsMechanicMask() && !((*i)->GetSpellInfo()->GetAllEffectsMechanicMask() & (1 << MECHANIC_STUN)))
+                uint32 auraMechanicMask = (*i)->GetSpellInfo()->GetAllEffectsMechanicMask();
+                if (auraMechanicMask && !Skyfire::Spells::HasMechanic(auraMechanicMask, MECHANIC_STUN))
                 {
                     foundNotStun = true;
                     break;
@@ -6468,7 +6470,7 @@ SpellCastResult Spell::CheckCasterAuras() const
                         switch (part->GetAuraType())
                         {
                             case SPELL_AURA_MOD_STUN:
-                                if (!usableInStun || !(auraInfo->GetAllEffectsMechanicMask() & (1 << MECHANIC_STUN)))
+                                if (!usableInStun || !Skyfire::Spells::HasMechanic(auraInfo->GetAllEffectsMechanicMask(), MECHANIC_STUN))
                                     return SpellCastResult::SPELL_FAILED_STUNNED;
                                 break;
                             case SPELL_AURA_MOD_CONFUSE:

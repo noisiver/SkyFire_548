@@ -339,12 +339,14 @@ target_include_directories(world_socket_session_state_tests PRIVATE
 add_test(NAME world_socket_session_state_tests COMMAND world_socket_session_state_tests)
 
 add_executable(game_domain_tests
+  ${CMAKE_SOURCE_DIR}/src/server/game/Spells/SpellTargeting.cpp
   GameDomainTestSupport.cpp
   GameDomainTests.cpp
 )
 
 target_include_directories(game_domain_tests PRIVATE
   ${CMAKE_BINARY_DIR}
+  ${CMAKE_SOURCE_DIR}/dep/recastnavigation/Detour
   ${CMAKE_SOURCE_DIR}/src/server/shared
   ${CMAKE_SOURCE_DIR}/src/server/shared/Configuration
   ${CMAKE_SOURCE_DIR}/src/server/shared/Cryptography

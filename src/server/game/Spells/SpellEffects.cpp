@@ -44,6 +44,7 @@
 #include "SpellAuraEffects.h"
 #include "SpellAuras.h"
 #include "SpellMgr.h"
+#include "SpellValidation.h"
 #include "TemporarySummon.h"
 #include "Totem.h"
 #include "Unit.h"
@@ -4850,7 +4851,7 @@ void Spell::EffectDispelMechanic(SpellEffIndex effIndex)
         if (!aura->GetApplicationOfTarget(unitTarget->GetGUID()))
             continue;
         if (roll_chance_i(aura->CalcDispelChance(unitTarget, !unitTarget->IsFriendlyTo(m_caster))))
-            if ((aura->GetSpellInfo()->GetAllEffectsMechanicMask() & (1 << mechanic)))
+            if (Skyfire::Spells::HasMechanic(aura->GetSpellInfo()->GetAllEffectsMechanicMask(), mechanic))
                 dispel_list.push(std::make_pair(aura->GetId(), aura->GetCasterGUID()));
     }
 
