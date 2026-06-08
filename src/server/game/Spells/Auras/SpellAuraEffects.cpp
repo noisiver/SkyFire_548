@@ -23,6 +23,7 @@
 #include "Spell.h"
 #include "SpellAuraEffects.h"
 #include "SpellMgr.h"
+#include "SpellValidation.h"
 #include "Unit.h"
 #include "Util.h"
 #include "Vehicle.h"
@@ -30,6 +31,42 @@
 #include "WorldPacket.h"
 
 class Aura;
+
+namespace
+{
+    uint32 GetCrowdControlImmunityMechanicMask()
+    {
+        return Skyfire::Spells::BuildMechanicMask({
+            MECHANIC_SNARE,
+            MECHANIC_ROOT,
+            MECHANIC_FEAR,
+            MECHANIC_STUN,
+            MECHANIC_SLEEP,
+            MECHANIC_CHARM,
+            MECHANIC_SAPPED,
+            MECHANIC_HORROR,
+            MECHANIC_POLYMORPH,
+            MECHANIC_DISORIENTED,
+            MECHANIC_FREEZE,
+            MECHANIC_TURN
+        });
+    }
+
+    uint32 GetStunImmunityMechanicMask()
+    {
+        return Skyfire::Spells::GetMechanicMask(MECHANIC_STUN);
+    }
+
+    uint32 GetLightControlImmunityMechanicMask()
+    {
+        return Skyfire::Spells::BuildMechanicMask({
+            MECHANIC_SNARE,
+            MECHANIC_STUN,
+            MECHANIC_DISORIENTED,
+            MECHANIC_FREEZE
+        });
+    }
+}
 //
 // EFFECT HANDLER NOTES
 //
@@ -3052,12 +3089,7 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
         {
             if (GetAmount())
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_ROOT)
-                    | (1 << MECHANIC_FEAR) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_SLEEP) | (1 << MECHANIC_CHARM)
-                    | (1 << MECHANIC_SAPPED) | (1 << MECHANIC_HORROR)
-                    | (1 << MECHANIC_POLYMORPH) | (1 << MECHANIC_DISORIENTED)
-                    | (1 << MECHANIC_FREEZE) | (1 << MECHANIC_TURN);
+                mechanic_immunity_list = GetCrowdControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_ROOT, apply);
@@ -3084,12 +3116,7 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
         {
             if (GetId() == 57742)
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_ROOT)
-                    | (1 << MECHANIC_FEAR) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_SLEEP) | (1 << MECHANIC_CHARM)
-                    | (1 << MECHANIC_SAPPED) | (1 << MECHANIC_HORROR)
-                    | (1 << MECHANIC_POLYMORPH) | (1 << MECHANIC_DISORIENTED)
-                    | (1 << MECHANIC_FREEZE) | (1 << MECHANIC_TURN);
+                mechanic_immunity_list = GetCrowdControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_ROOT, apply);
@@ -3116,18 +3143,13 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
         {
             if (GetId() == 64187)
             {
-                mechanic_immunity_list = (1 << MECHANIC_STUN);
+                mechanic_immunity_list = GetStunImmunityMechanicMask();
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_STUN, apply);
                 aura_immunity_list.push_back(SPELL_AURA_MOD_STUN);
             }
             else
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_ROOT)
-                    | (1 << MECHANIC_FEAR) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_SLEEP) | (1 << MECHANIC_CHARM)
-                    | (1 << MECHANIC_SAPPED) | (1 << MECHANIC_HORROR)
-                    | (1 << MECHANIC_POLYMORPH) | (1 << MECHANIC_DISORIENTED)
-                    | (1 << MECHANIC_FREEZE) | (1 << MECHANIC_TURN);
+                mechanic_immunity_list = GetCrowdControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_ROOT, apply);
@@ -3166,12 +3188,7 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
             }
             else
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_ROOT)
-                    | (1 << MECHANIC_FEAR) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_SLEEP) | (1 << MECHANIC_CHARM)
-                    | (1 << MECHANIC_SAPPED) | (1 << MECHANIC_HORROR)
-                    | (1 << MECHANIC_POLYMORPH) | (1 << MECHANIC_DISORIENTED)
-                    | (1 << MECHANIC_FREEZE) | (1 << MECHANIC_TURN);
+                mechanic_immunity_list = GetCrowdControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_ROOT, apply);
@@ -3199,12 +3216,7 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
         {
             if (!GetAmount())
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_ROOT)
-                    | (1 << MECHANIC_FEAR) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_SLEEP) | (1 << MECHANIC_CHARM)
-                    | (1 << MECHANIC_SAPPED) | (1 << MECHANIC_HORROR)
-                    | (1 << MECHANIC_POLYMORPH) | (1 << MECHANIC_DISORIENTED)
-                    | (1 << MECHANIC_FREEZE) | (1 << MECHANIC_TURN);
+                mechanic_immunity_list = GetCrowdControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_ROOT, apply);
@@ -3233,8 +3245,7 @@ void AuraEffect::HandleModStateImmunityMask(AuraApplication const* aurApp, uint8
         {
             if (GetAmount() == 1)
             {
-                mechanic_immunity_list = (1 << MECHANIC_SNARE) | (1 << MECHANIC_STUN)
-                    | (1 << MECHANIC_DISORIENTED) | (1 << MECHANIC_FREEZE);
+                mechanic_immunity_list = GetLightControlImmunityMechanicMask();
 
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_SNARE, apply);
                 target->ApplySpellImmune(GetId(), IMMUNITY_MECHANIC, MECHANIC_STUN, apply);

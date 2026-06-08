@@ -11,6 +11,7 @@
 #include "SpellAuraDefines.h"
 #include "SpellInfo.h"
 #include "SpellMgr.h"
+#include "SpellValidation.h"
 #include "Vehicle.h"
 
 uint32 GetTargetFlagMask(SpellTargetObjectTypes objType)
@@ -1976,32 +1977,29 @@ SpellSchoolMask SpellInfo::GetSchoolMask() const
 uint32 SpellInfo::GetAllEffectsMechanicMask() const
 {
     uint32 mask = 0;
-    if (Mechanic)
-        mask |= 1 << Mechanic;
+    mask |= Skyfire::Spells::GetMechanicMask(Mechanic);
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
         if (Effects[i].IsEffect() && Effects[i].Mechanic)
-            mask |= 1 << Effects[i].Mechanic;
+            mask |= Skyfire::Spells::GetMechanicMask(Effects[i].Mechanic);
     return mask;
 }
 
 uint32 SpellInfo::GetEffectMechanicMask(uint8 effIndex) const
 {
     uint32 mask = 0;
-    if (Mechanic)
-        mask |= 1 << Mechanic;
+    mask |= Skyfire::Spells::GetMechanicMask(Mechanic);
     if (Effects[effIndex].IsEffect() && Effects[effIndex].Mechanic)
-        mask |= 1 << Effects[effIndex].Mechanic;
+        mask |= Skyfire::Spells::GetMechanicMask(Effects[effIndex].Mechanic);
     return mask;
 }
 
 uint32 SpellInfo::GetSpellMechanicMaskByEffectMask(uint32 effectMask) const
 {
     uint32 mask = 0;
-    if (Mechanic)
-        mask |= 1 << Mechanic;
+    mask |= Skyfire::Spells::GetMechanicMask(Mechanic);
     for (uint8 i = 0; i < MAX_SPELL_EFFECTS; ++i)
-        if ((effectMask & (1 << i)) && Effects[i].Mechanic)
-            mask |= 1 << Effects[i].Mechanic;
+        if ((effectMask & Skyfire::Spells::GetEffectIndexMask(i)) && Effects[i].Mechanic)
+            mask |= Skyfire::Spells::GetMechanicMask(Effects[i].Mechanic);
     return mask;
 }
 
@@ -2029,11 +2027,7 @@ uint32 SpellInfo::GetDispelMask() const
 
 uint32 SpellInfo::GetDispelMask(DispelType type)
 {
-    // If dispel all
-    if (type == DISPEL_ALL)
-        return DISPEL_ALL_MASK;
-    else
-        return uint32(1 << type);
+    return Skyfire::Spells::GetDispelMask(type);
 }
 
 uint32 SpellInfo::GetExplicitTargetMask() const
@@ -2080,7 +2074,7 @@ AuraStateType SpellInfo::GetAuraState() const
         return AURA_STATE_ENRAGE;
 
     // Bleeding aura state
-    if (GetAllEffectsMechanicMask() & 1 << MECHANIC_BLEED)
+    if (Skyfire::Spells::HasMechanic(GetAllEffectsMechanicMask(), MECHANIC_BLEED))
         return AURA_STATE_BLEEDING;
 
     if (GetSchoolMask() & SPELL_SCHOOL_MASK_FROST)

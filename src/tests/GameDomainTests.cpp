@@ -6,6 +6,7 @@
 #include "Cell.h"
 #include "CurrencyFormulas.h"
 #include "GridDefines.h"
+#include "SpellValidation.h"
 #include "ThreatCalcHelper.h"
 #include "WorldPacket.h"
 
@@ -112,6 +113,51 @@ namespace
         return passed;
     }
 
+    bool TestSpellValidationMasks()
+    {
+        bool passed = true;
+
+        passed &= Expect(Skyfire::Spells::IsMechanicRepresentable(MECHANIC_STUN),
+            "Stun should be representable in a 32-bit spell mechanic mask");
+        passed &= Expect(!Skyfire::Spells::IsMechanicRepresentable(MECHANIC_NONE),
+            "Mechanic none should not set a mechanic mask bit");
+        passed &= Expect(!Skyfire::Spells::IsMechanicRepresentable(MECHANIC_WOUNDED),
+            "Mechanics outside the 32-bit mask should be rejected");
+
+        uint32 stunMask = Skyfire::Spells::GetMechanicMask(MECHANIC_STUN);
+        passed &= Expect(stunMask == (1u << MECHANIC_STUN),
+            "Mechanic mask should set the mechanic bit");
+        passed &= Expect(Skyfire::Spells::GetMechanicMask(MECHANIC_NONE) == 0,
+            "Mechanic none should build an empty mask");
+        passed &= Expect(Skyfire::Spells::GetMechanicMask(MECHANIC_WOUNDED) == 0,
+            "Out-of-range mechanics should build an empty mask");
+        passed &= Expect(Skyfire::Spells::HasMechanic(stunMask, MECHANIC_STUN),
+            "Mechanic mask lookup should find an active mechanic");
+        passed &= Expect(!Skyfire::Spells::HasMechanic(stunMask, MECHANIC_FEAR),
+            "Mechanic mask lookup should reject inactive mechanics");
+        passed &= Expect(Skyfire::Spells::BuildMechanicMask({ MECHANIC_SNARE, MECHANIC_ROOT, MECHANIC_WOUNDED }) ==
+            ((1u << MECHANIC_SNARE) | (1u << MECHANIC_ROOT)),
+            "Mechanic mask builder should combine representable mechanics only");
+        passed &= Expect(Skyfire::Spells::HasAnyMechanic(stunMask, { MECHANIC_FEAR, MECHANIC_STUN }),
+            "Mechanic mask lookup should find any requested active mechanic");
+
+        passed &= Expect(Skyfire::Spells::GetEffectIndexMask(0) == 1u,
+            "Effect index zero should map to the lowest mask bit");
+        passed &= Expect(Skyfire::Spells::GetEffectIndexMask(31) == 0x80000000u,
+            "Effect index thirty-one should map to the highest mask bit");
+        passed &= Expect(Skyfire::Spells::GetEffectIndexMask(32) == 0,
+            "Effect indexes outside the 32-bit mask should be rejected");
+
+        passed &= Expect(Skyfire::Spells::GetDispelMask(DISPEL_MAGIC) == (1u << DISPEL_MAGIC),
+            "Specific dispel types should map to their dispel bit");
+        passed &= Expect(Skyfire::Spells::GetDispelMask(DISPEL_ALL) == DISPEL_ALL_MASK,
+            "Dispel all should expand to all removable dispel types");
+        passed &= Expect(Skyfire::Spells::GetDispelMask(DispelType(32)) == 0,
+            "Out-of-range dispel types should build an empty mask");
+
+        return passed;
+    }
+
     bool TestGridAndCellPrimitives()
     {
         bool passed = true;
@@ -166,6 +212,7 @@ int main()
     passed &= TestCurrencyFormulaBoundaries();
     passed &= TestWorldPacketContainerBehavior();
     passed &= TestThreatSpellModifierRules();
+    passed &= TestSpellValidationMasks();
     passed &= TestGridAndCellPrimitives();
 
     return passed ? 0 : 1;
